@@ -129,8 +129,11 @@ function App() {
   const viewerRef = useRef(null)
   const xtermInstance = useRef(null)
   const fitAddonRef = useRef(null)
+  const selectedFileRef = useRef(null)
   
   const [selectedFile, setSelectedFile] = useState(null)
+
+  useEffect(() => { selectedFileRef.current = selectedFile }, [selectedFile])
   const [connected, setConnected] = useState(false)
   const [activeFocus, setActiveFocus] = useState('terminal')
   const [sidebarVisible, setSidebarVisible] = useState(true)
@@ -185,10 +188,10 @@ function App() {
       if (e.type === 'keydown') {
         if (e.ctrlKey && e.key === 'b') { toggleSidebar(); return false; }
         if (e.ctrlKey && (e.key === '`' || e.code === 'Backquote')) { handleFocusChange('terminal'); return false; }
-        if (e.key === 'Escape') { 
-            if (selectedFile) closeViewer();
-            else handleFocusChange('explorer'); 
-            return false; 
+        if (e.key === 'Escape') {
+            if (selectedFileRef.current) closeViewer();
+            else handleFocusChange('explorer');
+            return false;
         }
       }
       return true;
@@ -206,7 +209,7 @@ function App() {
     terminal.focus()
     const fitInterval = setInterval(() => { if (fitAddonRef.current) fitAddonRef.current.fit(); }, 1000);
     return () => { clearInterval(fitInterval); socket.disconnect(); terminal.dispose(); }
-  }, [handleFocusChange, toggleSidebar, selectedFile, closeViewer])
+  }, [handleFocusChange, toggleSidebar, closeViewer])
 
   useEffect(() => {
     const handleGlobalKeyDown = (e) => {
