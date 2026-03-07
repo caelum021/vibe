@@ -5,6 +5,7 @@ import { Unicode11Addon } from 'xterm-addon-unicode11'
 import { io } from 'socket.io-client'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import ReactMarkdown from 'react-markdown'
 
 const FileExplorer = ({ onFileSelect, isFocused, onFocus, innerRef }) => {
   const [files, setFiles] = useState([])
@@ -111,13 +112,41 @@ const FileViewer = ({ selectedFile, isFocused, onFocus, onClose, innerRef }) => 
         </button>
       </div>
       {selectedFile ? (
-        <SyntaxHighlighter
-          language={selectedFile.name.split('.').pop()}
-          style={vscDarkPlus}
-          customStyle={{ margin: 0, padding: 0, background: 'transparent', fontSize: '13px' }}
-        >
-          {content}
-        </SyntaxHighlighter>
+        selectedFile.name.endsWith('.md') ? (
+          <div style={{ color: '#ccc', lineHeight: '1.7', fontSize: '13px' }}>
+            <ReactMarkdown
+              components={{
+                h1: ({children}) => <h1 style={{ color: '#e0e0e0', borderBottom: '1px solid #333', paddingBottom: '8px', marginBottom: '16px' }}>{children}</h1>,
+                h2: ({children}) => <h2 style={{ color: '#e0e0e0', borderBottom: '1px solid #333', paddingBottom: '6px', marginTop: '24px', marginBottom: '12px' }}>{children}</h2>,
+                h3: ({children}) => <h3 style={{ color: '#e0e0e0', marginTop: '20px', marginBottom: '8px' }}>{children}</h3>,
+                p: ({children}) => <p style={{ marginBottom: '12px' }}>{children}</p>,
+                code: ({children, className, node, ...rest}) => {
+                  const isBlock = node?.position?.start?.line !== node?.position?.end?.line || !!className;
+                  return isBlock
+                    ? <SyntaxHighlighter language={className?.replace('language-', '') || 'text'} style={vscDarkPlus} customStyle={{ borderRadius: '6px', fontSize: '12px', marginBottom: '12px' }}>{String(children).replace(/\n$/, '')}</SyntaxHighlighter>
+                    : <code style={{ background: '#2d2d2d', padding: '2px 6px', borderRadius: '3px', color: '#f8c555', fontSize: '12px' }}>{children}</code>;
+                },
+                a: ({href, children}) => <a href={href} style={{ color: '#00bcd4' }} target="_blank" rel="noreferrer">{children}</a>,
+                ul: ({children}) => <ul style={{ paddingLeft: '20px', marginBottom: '12px' }}>{children}</ul>,
+                ol: ({children}) => <ol style={{ paddingLeft: '20px', marginBottom: '12px' }}>{children}</ol>,
+                li: ({children}) => <li style={{ marginBottom: '4px' }}>{children}</li>,
+                blockquote: ({children}) => <blockquote style={{ borderLeft: '3px solid #00bcd4', paddingLeft: '12px', margin: '0 0 12px 0', color: '#999' }}>{children}</blockquote>,
+                hr: () => <hr style={{ border: 'none', borderTop: '1px solid #333', margin: '20px 0' }} />,
+                strong: ({children}) => <strong style={{ color: '#e0e0e0' }}>{children}</strong>,
+              }}
+            >
+              {content}
+            </ReactMarkdown>
+          </div>
+        ) : (
+          <SyntaxHighlighter
+            language={selectedFile.name.split('.').pop()}
+            style={vscDarkPlus}
+            customStyle={{ margin: 0, padding: 0, background: 'transparent', fontSize: '13px' }}
+          >
+            {content}
+          </SyntaxHighlighter>
+        )
       ) : null}
     </div>
   )
