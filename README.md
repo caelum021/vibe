@@ -37,7 +37,7 @@ vibe ~/projects/my-awesome-app
 | Feature | Shortcut | Description |
 |:---:|:---:|:---|
 | **Toggle Sidebar** | `Ctrl + B` | Show or hide the file explorer. |
-| **Focus Terminal** | `Ctrl + \`` | Instantly move input focus to the terminal from anywhere. |
+| **Focus Terminal** | <kbd>Ctrl</kbd> + <kbd>`</kbd> | Instantly move input focus to the terminal from anywhere. |
 | **Navigate Explorer** | `Esc` | Exit the terminal/viewer and move to the file explorer. |
 | **Open File** | `Enter` | Select a file in the explorer to open it in the viewer (middle pane). |
 | **Close Viewer** | `Esc` | Close the viewer when it has focus. |
