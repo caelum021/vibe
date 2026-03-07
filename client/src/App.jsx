@@ -132,11 +132,11 @@ function App() {
   const selectedFileRef = useRef(null)
   
   const [selectedFile, setSelectedFile] = useState(null)
-
-  useEffect(() => { selectedFileRef.current = selectedFile }, [selectedFile])
   const [connected, setConnected] = useState(false)
   const [activeFocus, setActiveFocus] = useState('terminal')
   const [sidebarVisible, setSidebarVisible] = useState(true)
+
+  useEffect(() => { selectedFileRef.current = selectedFile }, [selectedFile])
 
   const handleFocusChange = useCallback((target) => {
     setActiveFocus(target);
@@ -206,25 +206,25 @@ function App() {
     terminal.onData((data) => socket.emit('terminal-input', data))
 
     const onResize = () => { fitAddon.fit(); socket.emit('terminal-resize', { cols: terminal.cols, rows: terminal.rows }); };
-    window.addEventListener('resize', onResize);
+    const resizeObserver = new ResizeObserver(onResize);
+    resizeObserver.observe(terminalRef.current);
     terminal.focus()
-    const fitInterval = setInterval(() => { if (fitAddonRef.current) fitAddonRef.current.fit(); }, 1000);
-    return () => { clearInterval(fitInterval); window.removeEventListener('resize', onResize); socket.disconnect(); terminal.dispose(); }
+    return () => { resizeObserver.disconnect(); socket.disconnect(); terminal.dispose(); }
   }, [handleFocusChange, toggleSidebar, closeViewer])
 
   useEffect(() => {
     const handleGlobalKeyDown = (e) => {
       if (e.ctrlKey && e.key === 'b') { e.preventDefault(); toggleSidebar(); }
       else if (e.ctrlKey && (e.key === '`' || e.code === 'Backquote')) { e.preventDefault(); handleFocusChange('terminal'); }
-      else if (e.key === 'Escape') { 
-          e.preventDefault(); 
-          if (selectedFile) closeViewer();
+      else if (e.key === 'Escape') {
+          e.preventDefault();
+          if (selectedFileRef.current) closeViewer();
           else handleFocusChange('explorer');
       }
     };
     window.addEventListener('keydown', handleGlobalKeyDown)
     return () => window.removeEventListener('keydown', handleGlobalKeyDown)
-  }, [handleFocusChange, toggleSidebar, selectedFile, closeViewer])
+  }, [handleFocusChange, toggleSidebar, closeViewer])
 
   return (
     <div style={{ display: 'flex', width: '100%', height: '100vh', backgroundColor: '#1a1a1a', overflow: 'hidden' }}>

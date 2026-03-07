@@ -89,11 +89,11 @@ io.on('connection', (socket) => {
   socket.on('start-command', () => {
     if (ptyProcess) return;
     ptyProcess = pty.spawn(shellPath, [], {
-        name: 'xterm-256color',
-        cols: 100,
-        rows: 30,
-        cwd: rootDir,
-        env: { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor' }
+      name: 'xterm-256color',
+      cols: 100,
+      rows: 30,
+      cwd: rootDir,
+      env: { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor' }
     });
     ptyProcess.onData((data) => socket.emit('terminal-data', data));
     socket.on('terminal-input', (data) => ptyProcess?.write(data));
