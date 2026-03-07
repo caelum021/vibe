@@ -6,6 +6,7 @@ import * as pty from 'node-pty';
 import os from 'os';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import open from 'open';
 
@@ -22,11 +23,18 @@ if (!fs.existsSync(rootDir) || !fs.statSync(rootDir).isDirectory()) {
   process.exit(1);
 }
 
+const SECRET_TOKEN = crypto.randomBytes(32).toString('hex');
+
 const app = express();
 const httpServer = createServer(app);
 
 const io = new Server(httpServer, {
-  cors: { origin: "*", methods: ["GET", "POST"] }
+  cors: { origin: `http://localhost:${3001}`, methods: ["GET", "POST"] }
+});
+
+io.use((socket, next) => {
+  if (socket.handshake.auth?.token === SECRET_TOKEN) return next();
+  next(new Error('Unauthorized'));
 });
 
 const clientBuildPath = path.resolve(__dirname, '../client/dist');
@@ -89,9 +97,6 @@ io.on('connection', (socket) => {
     ptyProcess.onData((data) => socket.emit('terminal-data', data));
     socket.on('terminal-input', (data) => ptyProcess?.write(data));
     socket.on('terminal-resize', ({ cols, rows }) => ptyProcess?.resize(cols, rows));
-    if (command && command !== 'shell') {
-        setTimeout(() => ptyProcess?.write(`${command}\r`), 1000);
-    }
   });
 
   socket.on('disconnect', () => {
@@ -110,6 +115,6 @@ const PORT = 3001;
 httpServer.listen(PORT, async () => {
   console.log(`\x1b[36m🚀 vibe v${VERSION} is active!\x1b[0m`);
   if (process.env.NODE_ENV !== 'test') {
-    try { await open(`http://localhost:${PORT}`); } catch (e) {}
+    try { await open(`http://localhost:${PORT}?token=${SECRET_TOKEN}`); } catch (e) {}
   }
 });

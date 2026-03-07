@@ -161,7 +161,8 @@ function App() {
 
   useEffect(() => {
     if (!terminalRef.current) return;
-    const socket = io()
+    const token = new URLSearchParams(window.location.search).get('token')
+    const socket = io({ auth: { token } })
     const terminal = new Terminal({
       cursorBlink: true,
       fontFamily: 'MesloLGS NF, monospace',
