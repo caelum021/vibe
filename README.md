@@ -36,11 +36,11 @@ vibe ~/projects/my-awesome-app
 
 | Feature | Shortcut | Description |
 |:---:|:---:|:---|
-| **Toggle Sidebar** | `Ctrl + B` | Show or hide the file explorer. |
+| **Toggle Sidebar** | <kbd>Ctrl</kbd> + <kbd>B</kbd> | Show or hide the file explorer. |
 | **Focus Terminal** | <kbd>Ctrl</kbd> + <kbd>`</kbd> | Instantly move input focus to the terminal from anywhere. |
-| **Navigate Explorer** | `Esc` | Exit the terminal/viewer and move to the file explorer. |
-| **Open File** | `Enter` | Select a file in the explorer to open it in the viewer (middle pane). |
-| **Close Viewer** | `Esc` | Close the viewer when it has focus. |
+| **Navigate Explorer** | <kbd>Esc</kbd> | Exit the terminal/viewer and move to the file explorer. |
+| **Open File** | <kbd>Enter</kbd> | Select a file in the explorer to open it in the viewer (middle pane). |
+| **Close Viewer** | <kbd>Esc</kbd> | Close the viewer when it has focus. |
 
 ## ✨ Key Features
 *   **Perfect Terminal**: 100% integrated with your default shell ($SHELL) and supports 256 colors.
