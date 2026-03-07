@@ -205,10 +205,11 @@ function App() {
     socket.on('terminal-data', (data) => terminal.write(data))
     terminal.onData((data) => socket.emit('terminal-input', data))
 
-    window.addEventListener('resize', () => { fitAddon.fit(); socket.emit('terminal-resize', { cols: terminal.cols, rows: terminal.rows }); });
+    const onResize = () => { fitAddon.fit(); socket.emit('terminal-resize', { cols: terminal.cols, rows: terminal.rows }); };
+    window.addEventListener('resize', onResize);
     terminal.focus()
     const fitInterval = setInterval(() => { if (fitAddonRef.current) fitAddonRef.current.fit(); }, 1000);
-    return () => { clearInterval(fitInterval); socket.disconnect(); terminal.dispose(); }
+    return () => { clearInterval(fitInterval); window.removeEventListener('resize', onResize); socket.disconnect(); terminal.dispose(); }
   }, [handleFocusChange, toggleSidebar, closeViewer])
 
   useEffect(() => {

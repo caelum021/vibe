@@ -24,12 +24,13 @@ if (!fs.existsSync(rootDir) || !fs.statSync(rootDir).isDirectory()) {
 }
 
 const SECRET_TOKEN = crypto.randomBytes(32).toString('hex');
+const PORT = 3001;
 
 const app = express();
 const httpServer = createServer(app);
 
 const io = new Server(httpServer, {
-  cors: { origin: `http://localhost:${3001}`, methods: ["GET", "POST"] }
+  cors: { origin: `http://localhost:${PORT}`, methods: ["GET", "POST"] }
 });
 
 io.use((socket, next) => {
@@ -46,7 +47,7 @@ const IGNORED = ['.git', 'node_modules', '.next', 'dist', '.gemini', 'vibe-pytho
 
 const validatePath = (userPath) => {
   const fullPath = path.resolve(userPath || rootDir);
-  if (!fullPath.startsWith(rootDir)) throw new Error('Access Denied');
+  if (fullPath !== rootDir && !fullPath.startsWith(rootDir + path.sep)) throw new Error('Access Denied');
   return fullPath;
 };
 
@@ -85,14 +86,14 @@ io.on('connection', (socket) => {
   if (exitTimeout) { clearTimeout(exitTimeout); exitTimeout = null; }
 
   let ptyProcess = null;
-  socket.on('start-command', (command) => {
+  socket.on('start-command', () => {
     if (ptyProcess) return;
     ptyProcess = pty.spawn(shellPath, [], {
         name: 'xterm-256color',
         cols: 100,
         rows: 30,
         cwd: rootDir,
-        env: { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor', LANG: 'ko_KR.UTF-8' }
+        env: { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor' }
     });
     ptyProcess.onData((data) => socket.emit('terminal-data', data));
     socket.on('terminal-input', (data) => ptyProcess?.write(data));
@@ -111,7 +112,6 @@ io.on('connection', (socket) => {
   });
 });
 
-const PORT = 3001;
 httpServer.listen(PORT, async () => {
   console.log(`\x1b[36m🚀 vibe v${VERSION} is active!\x1b[0m`);
   if (process.env.NODE_ENV !== 'test') {
