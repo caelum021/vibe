@@ -80,7 +80,7 @@ const FileExplorer = ({ onFileSelect, isFocused, onFocus, innerRef }) => {
   )
 }
 
-const FileViewer = ({ selectedFile, isFocused, onFocus, onClose, innerRef }) => {
+const FileViewer = ({ selectedFile, isFocused, onFocus, onClose, onToggleFullscreen, innerRef }) => {
   const [content, setContent] = useState('')
 
   useEffect(() => {
@@ -91,6 +91,15 @@ const FileViewer = ({ selectedFile, isFocused, onFocus, onClose, innerRef }) => 
         .catch(err => setContent('Error loading file content.'))
     }
   }, [selectedFile])
+
+  useEffect(() => {
+    if (!isFocused) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); onToggleFullscreen(); }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isFocused, onToggleFullscreen]);
 
   return (
     <div 
@@ -159,13 +168,16 @@ function App() {
   const xtermInstance = useRef(null)
   const fitAddonRef = useRef(null)
   const selectedFileRef = useRef(null)
-  
+  const viewerFullscreenRef = useRef(false)
+
   const [selectedFile, setSelectedFile] = useState(null)
   const [connected, setConnected] = useState(false)
   const [activeFocus, setActiveFocus] = useState('terminal')
   const [sidebarVisible, setSidebarVisible] = useState(true)
+  const [viewerFullscreen, setViewerFullscreen] = useState(false)
 
   useEffect(() => { selectedFileRef.current = selectedFile }, [selectedFile])
+  useEffect(() => { viewerFullscreenRef.current = viewerFullscreen }, [viewerFullscreen])
 
   const handleFocusChange = useCallback((target) => {
     setActiveFocus(target);
@@ -176,9 +188,15 @@ function App() {
 
   const closeViewer = useCallback(() => {
     setSelectedFile(null);
+    setViewerFullscreen(false);
     handleFocusChange('explorer');
     setTimeout(() => { if (fitAddonRef.current) fitAddonRef.current.fit(); }, 50);
   }, [handleFocusChange]);
+
+  const toggleViewerFullscreen = useCallback(() => {
+    setViewerFullscreen(prev => !prev);
+    setTimeout(() => { if (fitAddonRef.current) fitAddonRef.current.fit(); }, 50);
+  }, []);
 
   const handleFileSelect = useCallback((file) => {
     setSelectedFile(file);
@@ -218,7 +236,8 @@ function App() {
         if (e.ctrlKey && e.key === 'b') { toggleSidebar(); return false; }
         if (e.ctrlKey && (e.key === '`' || e.code === 'Backquote')) { handleFocusChange('terminal'); return false; }
         if (e.key === 'Escape') {
-            if (selectedFileRef.current) closeViewer();
+            if (viewerFullscreenRef.current) { setViewerFullscreen(false); setTimeout(() => { if (fitAddonRef.current) fitAddonRef.current.fit(); }, 50); }
+            else if (selectedFileRef.current) closeViewer();
             else handleFocusChange('explorer');
             return false;
         }
@@ -247,7 +266,8 @@ function App() {
       else if (e.ctrlKey && (e.key === '`' || e.code === 'Backquote')) { e.preventDefault(); handleFocusChange('terminal'); }
       else if (e.key === 'Escape') {
           e.preventDefault();
-          if (selectedFileRef.current) closeViewer();
+          if (viewerFullscreenRef.current) { setViewerFullscreen(false); setTimeout(() => { if (fitAddonRef.current) fitAddonRef.current.fit(); }, 50); }
+          else if (selectedFileRef.current) closeViewer();
           else handleFocusChange('explorer');
       }
     };
@@ -275,23 +295,25 @@ function App() {
 
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden', backgroundColor: '#1e1e1e' }}>
         {selectedFile && (
-          <div style={{ flex: 1, minWidth: '40%', borderRight: '1px solid #333', overflow: 'hidden' }}>
-            <FileViewer 
+          <div style={{ flex: viewerFullscreen ? '0 0 100%' : 1, minWidth: viewerFullscreen ? '100%' : '40%', borderRight: '1px solid #333', overflow: 'hidden' }}>
+            <FileViewer
               innerRef={viewerRef}
               onFocus={() => setActiveFocus('viewer')}
               onClose={closeViewer}
-              selectedFile={selectedFile} 
-              isFocused={activeFocus === 'viewer'} 
+              onToggleFullscreen={toggleViewerFullscreen}
+              selectedFile={selectedFile}
+              isFocused={activeFocus === 'viewer'}
             />
           </div>
         )}
 
-        <div 
+        <div
           onClick={() => handleFocusChange('terminal')}
-          style={{ 
+          style={{
             flex: 1, padding: '10px', boxSizing: 'border-box', overflow: 'hidden', position: 'relative',
             border: activeFocus === 'terminal' ? '1px solid #00bcd4' : '1px solid transparent',
-            transition: 'border 0.2s'
+            transition: 'border 0.2s',
+            display: viewerFullscreen ? 'none' : undefined
           }}
         >
           <div style={{ position: 'absolute', top: '5px', right: '15px', display: 'flex', alignItems: 'center', gap: '10px', zIndex: 10 }}>
