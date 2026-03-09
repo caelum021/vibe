@@ -55,17 +55,22 @@ const MarkdownView = ({ content }) => (
   </div>
 )
 
-const FileExplorer = ({ onFileSelect, isFocused, onFocus, innerRef }) => {
+const FileExplorer = ({ onFileSelect, isFocused, onFocus, innerRef, onAtRootChange }) => {
   const [files, setFiles] = useState([])
   const [currentPath, setCurrentPath] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(0)
+  const rootPath = useRef('')
 
   const fetchFiles = useCallback(async (path = '') => {
     try {
       const response = await fetch(`/api/files?path=${encodeURIComponent(path)}`)
       const data = await response.json()
+      if (data.currentPath) {
+        if (!rootPath.current) rootPath.current = data.currentPath
+        setCurrentPath(data.currentPath)
+        onAtRootChange(data.currentPath === rootPath.current)
+      }
       setFiles(data.items || [])
-      setCurrentPath(data.currentPath || '')
       setSelectedIndex(0)
     } catch (err) {
       console.error('Failed to fetch files:', err)
@@ -92,6 +97,7 @@ const FileExplorer = ({ onFileSelect, isFocused, onFocus, innerRef }) => {
         }
       } else if (e.key === 'Backspace') {
         e.preventDefault();
+        if (currentPath === rootPath.current) return; // already at root
         fetchFiles(currentPath + '/..');
       }
     };
@@ -129,14 +135,14 @@ const FileExplorer = ({ onFileSelect, isFocused, onFocus, innerRef }) => {
 }
 
 const FileViewer = ({
-  selectedFile, content, isEditing, editContent, isDirty,
+  selectedFile, content, isEditing, editContent, isDirty, isMd,
   onEditContentChange, onEnterEdit, onExitEdit, onSave,
   isFocused, onFocus, onClose, onToggleFullscreen, innerRef
 }) => {
   const [mdTab, setMdTab] = useState('edit')
   const textareaRef = useRef(null)
+  const lineNumbersRef = useRef(null)
   const ext = selectedFile?.name.split('.').pop() ?? ''
-  const isMd = ext === 'md'
 
   useEffect(() => { setMdTab('edit') }, [selectedFile])
 
@@ -261,19 +267,35 @@ const FileViewer = ({
       }}>
         {selectedFile && (
           showEditPane ? (
-            <textarea
-              ref={textareaRef}
-              value={editContent}
-              onChange={e => onEditContentChange(e.target.value)}
-              onKeyDown={handleTextareaKeyDown}
-              spellCheck={false}
-              style={{
-                flex: 1, width: '100%', background: '#1e1e1e', color: '#d4d4d4',
-                border: 'none', outline: 'none', resize: 'none',
-                padding: '15px', boxSizing: 'border-box',
-                fontFamily: 'MesloLGS NF, monospace', fontSize: '13px', lineHeight: '1.5'
-              }}
-            />
+            <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+              {/* Line number gutter */}
+              <div
+                ref={lineNumbersRef}
+                style={{
+                  padding: '15px 10px 15px 12px', background: '#1e1e1e', color: '#444',
+                  fontSize: '13px', lineHeight: '1.5', fontFamily: 'MesloLGS NF, monospace',
+                  textAlign: 'right', userSelect: 'none', overflowY: 'hidden',
+                  flexShrink: 0, borderRight: '1px solid #2a2a2a', minWidth: '40px'
+                }}
+              >
+                {editContent.split('\n').map((_, i) => <div key={i}>{i + 1}</div>)}
+              </div>
+              {/* Textarea */}
+              <textarea
+                ref={textareaRef}
+                value={editContent}
+                onChange={e => onEditContentChange(e.target.value)}
+                onKeyDown={handleTextareaKeyDown}
+                onScroll={e => { if (lineNumbersRef.current) lineNumbersRef.current.scrollTop = e.target.scrollTop }}
+                spellCheck={false}
+                style={{
+                  flex: 1, background: '#1e1e1e', color: '#d4d4d4',
+                  border: 'none', outline: 'none', resize: 'none',
+                  padding: '15px', boxSizing: 'border-box',
+                  fontFamily: 'MesloLGS NF, monospace', fontSize: '13px', lineHeight: '1.5'
+                }}
+              />
+            </div>
           ) : showPreviewPane ? (
             <MarkdownView content={editContent} />
           ) : isMd ? (
@@ -282,6 +304,8 @@ const FileViewer = ({
             <SyntaxHighlighter
               language={ext || 'text'}
               style={vscDarkPlus}
+              showLineNumbers={true}
+              lineNumberStyle={{ color: '#444', fontSize: '12px', minWidth: '2.5em' }}
               customStyle={{ margin: 0, padding: 0, background: 'transparent', fontSize: '13px' }}
             >
               {content}
@@ -318,6 +342,7 @@ function App() {
   const [activeFocus, setActiveFocus] = useState('terminal')
   const [sidebarVisible, setSidebarVisible] = useState(true)
   const [viewerFullscreen, setViewerFullscreen] = useState(false)
+  const [explorerAtRoot, setExplorerAtRoot] = useState(true)
 
   // Keep refs current on every render (synchronous, no useEffect lag)
   selectedFileRef.current = selectedFile
@@ -492,8 +517,68 @@ function App() {
     return () => window.removeEventListener('keydown', handleGlobalKeyDown)
   }, [handleFocusChange, toggleSidebar])
 
+  const isMd = selectedFile?.name.split('.').pop() === 'md'
+
+  // ── Footer shortcut hints ─────────────────────────────────────────────────
+  // Edit these arrays to change what's shown in the footer for each pane.
+  // Order: action keys first → Enter (if any) → Esc last.
+  // Each entry: ['Key label', 'Description']
+
+  const SHORTCUTS_EXPLORER = [
+    ['↑↓',                       'Navigate'],
+    ...(!explorerAtRoot ? [['⌫', 'Parent dir']] : []),
+    ['Ctrl+`',                   'Terminal'],
+    ['Enter',                    'Open'],       // Enter last (no Esc here)
+  ]
+
+  const SHORTCUTS_VIEWER_VIEW = [
+    ['E',      'Edit'],
+    ['Enter',  'Fullscreen'], // Enter second-to-last
+    ['Esc',    'Close'],      // Esc last
+  ]
+
+  const SHORTCUTS_VIEWER_FULLSCREEN = [
+    ['E',          'Edit'],
+    ['Enter / Esc', 'Exit fullscreen'],
+  ]
+
+  const SHORTCUTS_VIEWER_EDIT = [
+    ['Tab',    'Indent'],
+    ['Ctrl+S', 'Save'],
+    ['Esc',    'Exit edit'],  // Esc last
+  ]
+
+  const SHORTCUTS_VIEWER_EDIT_MD = [
+    ['Tab',    'Indent'],
+    ['Ctrl+P', 'Edit/Preview'], // markdown only
+    ['Ctrl+S', 'Save'],
+    ['Esc',    'Exit edit'],  // Esc last
+  ]
+
+  const SHORTCUTS_TERMINAL = [
+    ['Ctrl+B', 'Sidebar'],
+    ['Ctrl+`', 'Terminal'],
+    ['Esc',    'Close'],      // Esc last
+  ]
+
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const footerShortcuts = (() => {
+    if (activeFocus === 'explorer') return SHORTCUTS_EXPLORER
+    if (activeFocus === 'viewer') {
+      if (isEditing) return isMd ? SHORTCUTS_VIEWER_EDIT_MD : SHORTCUTS_VIEWER_EDIT
+      if (viewerFullscreen) return SHORTCUTS_VIEWER_FULLSCREEN
+      return SHORTCUTS_VIEWER_VIEW
+    }
+    return SHORTCUTS_TERMINAL
+  })()
+
+  const lineCount = selectedFile && !selectedFile.isDirectory
+    ? (isEditing ? editContent : fileContent).split('\n').length
+    : null
+
   return (
-    <div style={{ display: 'flex', width: '100%', height: '100vh', backgroundColor: '#1a1a1a', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100vh', backgroundColor: '#1a1a1a', overflow: 'hidden' }}>
 
       {/* Unsaved changes prompt */}
       {pendingAction && (
@@ -524,63 +609,88 @@ function App() {
         </div>
       )}
 
-      {/* Sidebar */}
-      <div style={{
-        width: sidebarVisible ? '250px' : '0px', opacity: sidebarVisible ? 1 : 0,
-        visibility: sidebarVisible ? 'visible' : 'hidden', display: 'flex', flexDirection: 'column',
-        borderRight: sidebarVisible ? '1px solid #333' : 'none', flexShrink: 0,
-        backgroundColor: '#1a1a1a', transition: 'width 0.3s ease-in-out, opacity 0.2s ease-in-out'
-      }}>
-        <div style={{ flex: 1, overflow: 'hidden' }}>
-          <FileExplorer
-            innerRef={explorerRef}
-            onFocus={focusExplorer}
-            onFileSelect={handleFileSelect}
-            isFocused={activeFocus === 'explorer'}
-          />
-        </div>
-      </div>
+      {/* Main row: sidebar + content */}
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
 
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', backgroundColor: '#1e1e1e' }}>
-        {selectedFile && (
-          <div style={{ flex: viewerFullscreen ? '0 0 100%' : 1, minWidth: viewerFullscreen ? '100%' : '40%', borderRight: '1px solid #333', overflow: 'hidden' }}>
-            <FileViewer
-              innerRef={viewerRef}
-              onFocus={focusViewer}
-              onClose={closeViewer}
-              onToggleFullscreen={toggleViewerFullscreen}
-              onEnterEdit={enterEditMode}
-              onExitEdit={exitEditMode}
-              onSave={saveFile}
-              onEditContentChange={setEditContent}
-              selectedFile={selectedFile}
-              content={fileContent}
-              isEditing={isEditing}
-              editContent={editContent}
-              isDirty={isDirty}
-              isFocused={activeFocus === 'viewer'}
+        {/* Sidebar */}
+        <div style={{
+          width: sidebarVisible ? '250px' : '0px', opacity: sidebarVisible ? 1 : 0,
+          visibility: sidebarVisible ? 'visible' : 'hidden', display: 'flex', flexDirection: 'column',
+          borderRight: sidebarVisible ? '1px solid #333' : 'none', flexShrink: 0,
+          backgroundColor: '#1a1a1a', transition: 'width 0.3s ease-in-out, opacity 0.2s ease-in-out'
+        }}>
+          <div style={{ flex: 1, overflow: 'hidden' }}>
+            <FileExplorer
+              innerRef={explorerRef}
+              onFocus={focusExplorer}
+              onFileSelect={handleFileSelect}
+              isFocused={activeFocus === 'explorer'}
+              onAtRootChange={setExplorerAtRoot}
             />
           </div>
-        )}
-
-        <div
-          onClick={() => handleFocusChange('terminal')}
-          style={{
-            flex: 1, padding: '10px', boxSizing: 'border-box', overflow: 'hidden', position: 'relative',
-            border: activeFocus === 'terminal' ? '1px solid #00bcd4' : '1px solid transparent',
-            transition: 'border 0.2s',
-            display: viewerFullscreen ? 'none' : undefined
-          }}
-        >
-          <div style={{ position: 'absolute', top: '5px', right: '15px', display: 'flex', alignItems: 'center', gap: '10px', zIndex: 10 }}>
-            <span style={{ color: '#444', fontSize: '9px' }}>Ctrl+B: Sidebar | Esc: Close | Ctrl+`: Terminal</span>
-            <span style={{ color: connected ? '#4caf50' : '#f44336', fontSize: '10px' }}>
-              {connected ? '● ONLINE' : '○ OFFLINE'}
-            </span>
-          </div>
-          <div ref={terminalRef} style={{ width: '100%', height: '100%' }} />
         </div>
+
+        <div style={{ display: 'flex', flex: 1, overflow: 'hidden', backgroundColor: '#1e1e1e' }}>
+          {selectedFile && (
+            <div style={{ flex: viewerFullscreen ? '0 0 100%' : 1, minWidth: viewerFullscreen ? '100%' : '40%', borderRight: '1px solid #333', overflow: 'hidden' }}>
+              <FileViewer
+                innerRef={viewerRef}
+                onFocus={focusViewer}
+                onClose={closeViewer}
+                onToggleFullscreen={toggleViewerFullscreen}
+                onEnterEdit={enterEditMode}
+                onExitEdit={exitEditMode}
+                onSave={saveFile}
+                onEditContentChange={setEditContent}
+                selectedFile={selectedFile}
+                content={fileContent}
+                isEditing={isEditing}
+                editContent={editContent}
+                isDirty={isDirty}
+                isMd={isMd}
+                isFocused={activeFocus === 'viewer'}
+              />
+            </div>
+          )}
+
+          <div
+            onClick={() => handleFocusChange('terminal')}
+            style={{
+              flex: 1, padding: '10px', boxSizing: 'border-box', overflow: 'hidden', position: 'relative',
+              border: activeFocus === 'terminal' ? '1px solid #00bcd4' : '1px solid transparent',
+              transition: 'border 0.2s',
+              display: viewerFullscreen ? 'none' : undefined
+            }}
+          >
+            <div style={{ position: 'absolute', top: '5px', right: '15px', zIndex: 10 }}>
+              <span style={{ color: connected ? '#4caf50' : '#f44336', fontSize: '10px' }}>
+                {connected ? '● ONLINE' : '○ OFFLINE'}
+              </span>
+            </div>
+            <div ref={terminalRef} style={{ width: '100%', height: '100%' }} />
+          </div>
+        </div>
+
       </div>
+
+      {/* Footer */}
+      <div style={{
+        height: '22px', backgroundColor: '#161616', borderTop: '1px solid #2a2a2a',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '0 12px', flexShrink: 0
+      }}>
+        <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+          {footerShortcuts.map(([key, desc]) => (
+            <span key={key} style={{ fontSize: '11px', color: '#555' }}>
+              <span style={{ color: '#777', fontWeight: '500' }}>{key}</span>{' '}{desc}
+            </span>
+          ))}
+        </div>
+        {activeFocus === 'viewer' && lineCount !== null && (
+          <span style={{ fontSize: '11px', color: '#555' }}>{lineCount} lines</span>
+        )}
+      </div>
+
     </div>
   )
 }
