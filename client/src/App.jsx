@@ -92,7 +92,7 @@ const FileExplorer = ({ onFileSelect, isFocused, onFocus, innerRef }) => {
         }
       } else if (e.key === 'Backspace') {
         e.preventDefault();
-        fetchFiles(currentPath.split('/').slice(0, -1).join('/') || '/');
+        fetchFiles(currentPath + '/..');
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -135,7 +135,8 @@ const FileViewer = ({
 }) => {
   const [mdTab, setMdTab] = useState('edit')
   const textareaRef = useRef(null)
-  const isMd = selectedFile?.name.endsWith('.md')
+  const ext = selectedFile?.name.split('.').pop() ?? ''
+  const isMd = ext === 'md'
 
   useEffect(() => { setMdTab('edit') }, [selectedFile])
 
@@ -167,7 +168,7 @@ const FileViewer = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isEditing, isMd]);
 
-  const handleTextareaKeyDown = (e) => {
+  const handleTextareaKeyDown = useCallback((e) => {
     if (e.key === 'Tab') {
       e.preventDefault();
       const s = e.target.selectionStart;
@@ -187,7 +188,7 @@ const FileViewer = ({
       e.stopPropagation();
       onExitEdit();
     }
-  };
+  }, [editContent, onEditContentChange, onSave, onExitEdit]);
 
   const showEditPane = isEditing && (!isMd || mdTab === 'edit');
   const showPreviewPane = isEditing && isMd && mdTab === 'preview';
@@ -279,7 +280,7 @@ const FileViewer = ({
             <MarkdownView content={content} />
           ) : (
             <SyntaxHighlighter
-              language={selectedFile.name.split('.').pop()}
+              language={ext || 'text'}
               style={vscDarkPlus}
               customStyle={{ margin: 0, padding: 0, background: 'transparent', fontSize: '13px' }}
             >
@@ -413,6 +414,8 @@ function App() {
 
   const exitEditMode = useCallback(() => requireClean({ type: 'exitEdit' }), [requireClean]);
   const closeViewer = useCallback(() => requireClean({ type: 'close' }), [requireClean]);
+  const focusExplorer = useCallback(() => setActiveFocus('explorer'), []);
+  const focusViewer = useCallback(() => setActiveFocus('viewer'), []);
 
   const handleUnsavedSave = useCallback(async () => {
     const action = pendingAction;
@@ -531,7 +534,7 @@ function App() {
         <div style={{ flex: 1, overflow: 'hidden' }}>
           <FileExplorer
             innerRef={explorerRef}
-            onFocus={() => setActiveFocus('explorer')}
+            onFocus={focusExplorer}
             onFileSelect={handleFileSelect}
             isFocused={activeFocus === 'explorer'}
           />
@@ -543,7 +546,7 @@ function App() {
           <div style={{ flex: viewerFullscreen ? '0 0 100%' : 1, minWidth: viewerFullscreen ? '100%' : '40%', borderRight: '1px solid #333', overflow: 'hidden' }}>
             <FileViewer
               innerRef={viewerRef}
-              onFocus={() => setActiveFocus('viewer')}
+              onFocus={focusViewer}
               onClose={closeViewer}
               onToggleFullscreen={toggleViewerFullscreen}
               onEnterEdit={enterEditMode}

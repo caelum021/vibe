@@ -52,10 +52,11 @@ const validatePath = (userPath) => {
   return fullPath;
 };
 
-app.get('/api/files', (req, res) => {
+app.get('/api/files', async (req, res) => {
   try {
     const targetPath = validatePath(req.query.path);
-    const items = fs.readdirSync(targetPath, { withFileTypes: true })
+    const entries = await fs.promises.readdir(targetPath, { withFileTypes: true });
+    const items = entries
       .filter(item => !IGNORED.includes(item.name))
       .map(item => ({
         name: item.name,
@@ -67,23 +68,23 @@ app.get('/api/files', (req, res) => {
   } catch (err) { res.status(403).json({ error: err.message }); }
 });
 
-app.get('/api/file-content', (req, res) => {
-    try {
-        const filePath = validatePath(req.query.path);
-        const stats = fs.statSync(filePath);
-        if (stats.size > 1024 * 1024) return res.json({ content: 'File too large' });
-        const buffer = fs.readFileSync(filePath);
-        if (buffer.slice(0, 100).some(b => b === 0)) return res.json({ content: 'Binary file detected.' });
-        res.json({ content: buffer.toString('utf8') });
-    } catch (err) { res.status(403).json({ error: err.message }); }
+app.get('/api/file-content', async (req, res) => {
+  try {
+    const filePath = validatePath(req.query.path);
+    const stats = await fs.promises.stat(filePath);
+    if (stats.size > 1024 * 1024) return res.json({ content: 'File too large' });
+    const buffer = await fs.promises.readFile(filePath);
+    if (buffer.slice(0, 100).some(b => b === 0)) return res.json({ content: 'Binary file detected.' });
+    res.json({ content: buffer.toString('utf8') });
+  } catch (err) { res.status(403).json({ error: err.message }); }
 });
 
-app.post('/api/file-write', (req, res) => {
+app.post('/api/file-write', async (req, res) => {
   try {
     const { path: filePath, content } = req.body;
     if (typeof content !== 'string') return res.status(400).json({ error: 'Invalid content' });
     const validPath = validatePath(filePath);
-    fs.writeFileSync(validPath, content, 'utf8');
+    await fs.promises.writeFile(validPath, content, 'utf8');
     res.json({ success: true });
   } catch (err) { res.status(403).json({ error: err.message }); }
 });
