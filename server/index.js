@@ -27,6 +27,7 @@ const SECRET_TOKEN = crypto.randomBytes(32).toString('hex');
 const PORT = 3001;
 
 const app = express();
+app.use(express.json());
 const httpServer = createServer(app);
 
 const io = new Server(httpServer, {
@@ -75,6 +76,16 @@ app.get('/api/file-content', (req, res) => {
         if (buffer.slice(0, 100).some(b => b === 0)) return res.json({ content: 'Binary file detected.' });
         res.json({ content: buffer.toString('utf8') });
     } catch (err) { res.status(403).json({ error: err.message }); }
+});
+
+app.post('/api/file-write', (req, res) => {
+  try {
+    const { path: filePath, content } = req.body;
+    if (typeof content !== 'string') return res.status(400).json({ error: 'Invalid content' });
+    const validPath = validatePath(filePath);
+    fs.writeFileSync(validPath, content, 'utf8');
+    res.json({ success: true });
+  } catch (err) { res.status(403).json({ error: err.message }); }
 });
 
 const shellPath = process.env.SHELL || (os.platform() === 'win32' ? 'powershell.exe' : 'bash');
