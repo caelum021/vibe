@@ -6,6 +6,7 @@ import { io } from 'socket.io-client'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 const FileExplorer = ({ onFileSelect, isFocused, onFocus, innerRef }) => {
   const [files, setFiles] = useState([])
@@ -124,6 +125,7 @@ const FileViewer = ({ selectedFile, isFocused, onFocus, onClose, onToggleFullscr
         selectedFile.name.endsWith('.md') ? (
           <div style={{ color: '#ccc', lineHeight: '1.7', fontSize: '13px' }}>
             <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
               components={{
                 h1: ({children}) => <h1 style={{ color: '#e0e0e0', borderBottom: '1px solid #333', paddingBottom: '8px', marginBottom: '16px' }}>{children}</h1>,
                 h2: ({children}) => <h2 style={{ color: '#e0e0e0', borderBottom: '1px solid #333', paddingBottom: '6px', marginTop: '24px', marginBottom: '12px' }}>{children}</h2>,
@@ -142,6 +144,11 @@ const FileViewer = ({ selectedFile, isFocused, onFocus, onClose, onToggleFullscr
                 blockquote: ({children}) => <blockquote style={{ borderLeft: '3px solid #00bcd4', paddingLeft: '12px', margin: '0 0 12px 0', color: '#999' }}>{children}</blockquote>,
                 hr: () => <hr style={{ border: 'none', borderTop: '1px solid #333', margin: '20px 0' }} />,
                 strong: ({children}) => <strong style={{ color: '#e0e0e0' }}>{children}</strong>,
+                table: ({children}) => <table style={{ borderCollapse: 'collapse', width: '100%', marginBottom: '16px', fontSize: '13px' }}>{children}</table>,
+                thead: ({children}) => <thead style={{ borderBottom: '1px solid #444' }}>{children}</thead>,
+                th: ({children}) => <th style={{ padding: '6px 12px', textAlign: 'left', color: '#e0e0e0', fontWeight: '600', whiteSpace: 'nowrap' }}>{children}</th>,
+                td: ({children}) => <td style={{ padding: '6px 12px', borderBottom: '1px solid #2a2a2a', color: '#ccc' }}>{children}</td>,
+                tr: ({children}) => <tr style={{ transition: 'background 0.1s' }}>{children}</tr>,
               }}
             >
               {content}
