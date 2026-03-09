@@ -59,9 +59,11 @@ const FileExplorer = ({ onFileSelect, isFocused, onFocus, innerRef, onAtRootChan
   const [files, setFiles] = useState([])
   const [currentPath, setCurrentPath] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(0)
+  const [naming, setNaming] = useState({ active: false, type: '', value: '', oldPath: '' })
   const rootPath = useRef('')
+  const inputRef = useRef(null)
 
-  const fetchFiles = useCallback(async (path = '') => {
+  const fetchFiles = useCallback(async (path = '', selectName = null) => {
     try {
       const response = await fetch(`/api/files?path=${encodeURIComponent(path)}`)
       const data = await response.json()
@@ -70,18 +72,91 @@ const FileExplorer = ({ onFileSelect, isFocused, onFocus, innerRef, onAtRootChan
         setCurrentPath(data.currentPath)
         onAtRootChange(data.currentPath === rootPath.current)
       }
-      setFiles(data.items || [])
-      setSelectedIndex(0)
+      const newFiles = data.items || []
+      setFiles(newFiles)
+      if (selectName) {
+        const idx = newFiles.findIndex(f => f.name === selectName)
+        if (idx !== -1) setSelectedIndex(idx)
+      } else {
+        setSelectedIndex(0)
+      }
     } catch (err) {
       console.error('Failed to fetch files:', err)
     }
-  }, [])
+  }, [onAtRootChange])
 
   useEffect(() => { fetchFiles() }, [fetchFiles])
 
   useEffect(() => {
-    if (!isFocused) return;
+    if (naming.active && inputRef.current) {
+      inputRef.current.focus()
+      // Select filename part for rename
+      if (naming.type === 'rename') {
+        const dotIndex = naming.value.lastIndexOf('.')
+        inputRef.current.setSelectionRange(0, dotIndex > 0 ? dotIndex : naming.value.length)
+      }
+    }
+  }, [naming.active, naming.type, naming.value])
+
+  const handleNamingSubmit = async (e) => {
+    e.preventDefault()
+    if (!naming.value) { setNaming({ active: false }); return; }
+    
+    try {
+      let success = false
+      if (naming.type === 'file' || naming.type === 'dir') {
+        const res = await fetch('/api/create-item', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: currentPath + '/' + naming.value, isDirectory: naming.type === 'dir' })
+        })
+        success = res.ok
+      } else if (naming.type === 'rename') {
+        const res = await fetch('/api/rename-item', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ oldPath: naming.oldPath, newPath: currentPath + '/' + naming.value })
+        })
+        success = res.ok
+      }
+
+      if (success) {
+        const newName = naming.value
+        setNaming({ active: false })
+        fetchFiles(currentPath, newName)
+      }
+    } catch (err) { console.error('Action failed:', err) }
+  }
+
+  const handleDelete = async () => {
+    const file = files[selectedIndex]
+    if (!file) return
+    if (!window.confirm(`Delete ${file.name}?`)) return
+    
+    try {
+      const res = await fetch('/api/delete-item', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: file.path })
+      })
+      if (res.ok) {
+        onFileSelect(null)
+        fetchFiles(currentPath)
+      }
+    } catch (err) { console.error('Delete failed:', err) }
+  }
+
+  const copyPath = () => {
+    const file = files[selectedIndex]
+    if (!file) return
+    const relPath = file.path.replace(rootPath.current + '/', '').replace(rootPath.current, '.')
+    navigator.clipboard.writeText(relPath)
+  }
+
+  useEffect(() => {
+    if (!isFocused || naming.active) return;
     const handleKeyDown = (e) => {
+      const key = resolveKey(e.key).toLowerCase() // Normalize to lowercase
       if (e.key === 'ArrowDown') {
         e.preventDefault();
         setSelectedIndex(prev => Math.min(files.length - 1, prev + 1));
@@ -97,13 +172,42 @@ const FileExplorer = ({ onFileSelect, isFocused, onFocus, innerRef, onAtRootChan
         }
       } else if (e.key === 'Backspace') {
         e.preventDefault();
-        if (currentPath === rootPath.current) return; // already at root
+        if (currentPath === rootPath.current) return;
         fetchFiles(currentPath + '/..');
+      } else if (key === 'a') {
+        e.preventDefault();
+        setNaming({ active: true, type: e.shiftKey ? 'dir' : 'file', value: '', oldPath: '' });
+      } else if (key === 'r') {
+        e.preventDefault();
+        const file = files[selectedIndex];
+        if (file) setNaming({ active: true, type: 'rename', value: file.name, oldPath: file.path });
+      } else if (e.key === 'Delete' || (e.metaKey && e.key === 'Backspace')) {
+        e.preventDefault();
+        handleDelete();
+      } else if (key === 'c') {
+        e.preventDefault();
+        copyPath();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isFocused, files, selectedIndex, fetchFiles, onFileSelect, currentPath]);
+  }, [isFocused, files, selectedIndex, fetchFiles, onFileSelect, currentPath, naming.active, handleDelete]);
+
+  const renderNamingInput = () => (
+    <form onSubmit={handleNamingSubmit} style={{ padding: '4px 8px' }}>
+      <input
+        ref={inputRef}
+        value={naming.value}
+        onChange={e => setNaming({ ...naming, value: e.target.value })}
+        onBlur={() => setNaming({ active: false })}
+        onKeyDown={e => { if (e.key === 'Escape') setNaming({ active: false }) }}
+        style={{
+          width: '100%', background: '#222', border: '1px solid #00bcd4', color: '#fff',
+          fontSize: '12px', padding: '2px 4px', borderRadius: '2px', outline: 'none'
+        }}
+      />
+    </form>
+  )
 
   return (
     <div
@@ -115,19 +219,28 @@ const FileExplorer = ({ onFileSelect, isFocused, onFocus, innerRef, onAtRootChan
       }}
     >
       <div style={{ fontWeight: 'bold', marginBottom: '10px', color: '#00bcd4', fontSize: '12px' }}>Project</div>
+      
+      {/* New Item Input at Top */}
+      {naming.active && (naming.type === 'file' || naming.type === 'dir') && renderNamingInput()}
+
       {files.map((file, idx) => (
-        <div
-          key={file.path}
-          onClick={() => { setSelectedIndex(idx); if (file.isDirectory) fetchFiles(file.path); else onFileSelect(file); }}
-          style={{
-            padding: '4px 8px', cursor: 'pointer', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-            borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px',
-            backgroundColor: idx === selectedIndex && isFocused ? '#333' : 'transparent',
-            color: idx === selectedIndex && isFocused ? '#00bcd4' : '#ccc'
-          }}
-        >
-          <span>{file.isDirectory ? '📁' : '📄'}</span>
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{file.name}</span>
+        <div key={file.path}>
+          {naming.active && naming.type === 'rename' && idx === selectedIndex ? (
+            renderNamingInput()
+          ) : (
+            <div
+              onClick={() => { setSelectedIndex(idx); if (file.isDirectory) fetchFiles(file.path); else onFileSelect(file); }}
+              style={{
+                padding: '4px 8px', cursor: 'pointer', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px',
+                backgroundColor: idx === selectedIndex && isFocused ? '#333' : 'transparent',
+                color: idx === selectedIndex && isFocused ? '#00bcd4' : '#ccc'
+              }}
+            >
+              <span>{file.isDirectory ? '📁' : '📄'}</span>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{file.name}</span>
+            </div>
+          )}
         </div>
       ))}
     </div>
@@ -527,6 +640,10 @@ function App() {
   const SHORTCUTS_EXPLORER = [
     ['↑↓',                       'Navigate'],
     ...(!explorerAtRoot ? [['⌫', 'Parent dir']] : []),
+    ['A/Shift+A',                'New File/Dir'],
+    ['R',                        'Rename'],
+    ['Del',                      'Delete'],
+    ['C',                        'Copy path'],
     ['Ctrl+`',                   'Terminal'],
     ['Enter',                    'Open'],       // Enter last (no Esc here)
   ]

@@ -46,8 +46,9 @@ if (fs.existsSync(clientBuildPath)) {
 
 const IGNORED = ['.git', 'node_modules', '.next', 'dist', '.gemini', 'vibe-python', '.claude'];
 
-const validatePath = (userPath) => {
+const validatePath = (userPath, allowRoot = true) => {
   const fullPath = path.resolve(userPath || rootDir);
+  if (fullPath === rootDir && !allowRoot) throw new Error('Action not allowed on root directory');
   if (fullPath !== rootDir && !fullPath.startsWith(rootDir + path.sep)) throw new Error('Access Denied');
   return fullPath;
 };
@@ -83,8 +84,45 @@ app.post('/api/file-write', async (req, res) => {
   try {
     const { path: filePath, content } = req.body;
     if (typeof content !== 'string') return res.status(400).json({ error: 'Invalid content' });
-    const validPath = validatePath(filePath);
+    const validPath = validatePath(filePath, false);
     await fs.promises.writeFile(validPath, content, 'utf8');
+    res.json({ success: true });
+  } catch (err) { res.status(403).json({ error: err.message }); }
+});
+
+app.post('/api/create-item', async (req, res) => {
+  try {
+    const { path: itemPath, isDirectory } = req.body;
+    const validPath = validatePath(itemPath, false);
+    if (isDirectory) {
+      await fs.promises.mkdir(validPath, { recursive: true });
+    } else {
+      await fs.promises.writeFile(validPath, '', 'utf8');
+    }
+    res.json({ success: true });
+  } catch (err) { res.status(403).json({ error: err.message }); }
+});
+
+app.post('/api/delete-item', async (req, res) => {
+  try {
+    const { path: itemPath } = req.body;
+    const validPath = validatePath(itemPath, false);
+    const stats = await fs.promises.stat(validPath);
+    if (stats.isDirectory()) {
+      await fs.promises.rm(validPath, { recursive: true, force: true });
+    } else {
+      await fs.promises.unlink(validPath);
+    }
+    res.json({ success: true });
+  } catch (err) { res.status(403).json({ error: err.message }); }
+});
+
+app.post('/api/rename-item', async (req, res) => {
+  try {
+    const { oldPath, newPath } = req.body;
+    const validOldPath = validatePath(oldPath, false);
+    const validNewPath = validatePath(newPath, false);
+    await fs.promises.rename(validOldPath, validNewPath);
     res.json({ success: true });
   } catch (err) { res.status(403).json({ error: err.message }); }
 });
@@ -109,7 +147,11 @@ io.on('connection', (socket) => {
     });
     ptyProcess.onData((data) => socket.emit('terminal-data', data));
     socket.on('terminal-input', (data) => ptyProcess?.write(data));
-    socket.on('terminal-resize', ({ cols, rows }) => ptyProcess?.resize(cols, rows));
+    socket.on('terminal-resize', ({ cols, rows }) => {
+      try {
+        if (cols > 0 && rows > 0) ptyProcess?.resize(cols, rows);
+      } catch (err) { console.error('Terminal resize failed:', err); }
+    });
   });
 
   socket.on('disconnect', () => {
