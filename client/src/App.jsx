@@ -1,9 +1,6 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
-import { Terminal } from 'xterm'
-import { FitAddon } from 'xterm-addon-fit'
-import { Unicode11Addon } from 'xterm-addon-unicode11'
-import { io } from 'socket.io-client'
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
+import * as api from './api'
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -18,6 +15,7 @@ const KEY_ALIASES = {
   'ㅗ': 'h', 'ㅓ': 'j', 'ㅏ': 'k', 'ㅣ': 'l',
   'ㅋ': 'z', 'ㅌ': 'x', 'ㅊ': 'c', 'ㅍ': 'v',
   'ㅠ': 'b', 'ㅜ': 'n', 'ㅡ': 'm',
+  '₩': '`',
 }
 const resolveKey = (key) => KEY_ALIASES[key] ?? key
 
@@ -55,7 +53,7 @@ const MarkdownView = ({ content }) => (
   </div>
 )
 
-const FileExplorer = ({ onFileSelect, isFocused, onFocus, innerRef, onAtRootChange }) => {
+const FileExplorer = ({ onFileSelect, isFocused, onFocus, innerRef, onAtRootChange, refreshKey }) => {
   const [files, setFiles] = useState([])
   const [currentPath, setCurrentPath] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(0)
@@ -65,8 +63,7 @@ const FileExplorer = ({ onFileSelect, isFocused, onFocus, innerRef, onAtRootChan
 
   const fetchFiles = useCallback(async (path = '', selectName = null) => {
     try {
-      const response = await fetch(`/api/files?path=${encodeURIComponent(path)}`)
-      const data = await response.json()
+      const data = await api.listFiles(path)
       if (data.currentPath) {
         if (!rootPath.current) rootPath.current = data.currentPath
         setCurrentPath(data.currentPath)
@@ -87,6 +84,11 @@ const FileExplorer = ({ onFileSelect, isFocused, onFocus, innerRef, onAtRootChan
 
   useEffect(() => { fetchFiles() }, [fetchFiles])
 
+  // Re-fetch when file watcher triggers a refresh
+  useEffect(() => {
+    if (refreshKey > 0) fetchFiles(currentPath)
+  }, [refreshKey]) // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     if (naming.active && inputRef.current) {
       inputRef.current.focus()
@@ -103,28 +105,16 @@ const FileExplorer = ({ onFileSelect, isFocused, onFocus, innerRef, onAtRootChan
     if (!naming.value) { setNaming({ active: false }); return; }
     
     try {
-      let success = false
       if (naming.type === 'file' || naming.type === 'dir') {
-        const res = await fetch('/api/create-item', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ path: currentPath + '/' + naming.value, isDirectory: naming.type === 'dir' })
-        })
-        success = res.ok
+        await api.createItem(currentPath + '/' + naming.value, naming.type === 'dir')
       } else if (naming.type === 'rename') {
-        const res = await fetch('/api/rename-item', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ oldPath: naming.oldPath, newPath: currentPath + '/' + naming.value })
-        })
-        success = res.ok
+        await api.renameItem(naming.oldPath, currentPath + '/' + naming.value)
+      } else {
+        return
       }
-
-      if (success) {
-        const newName = naming.value
-        setNaming({ active: false })
-        fetchFiles(currentPath, newName)
-      }
+      const newName = naming.value
+      setNaming({ active: false })
+      fetchFiles(currentPath, newName)
     } catch (err) { console.error('Action failed:', err) }
   }
 
@@ -134,15 +124,9 @@ const FileExplorer = ({ onFileSelect, isFocused, onFocus, innerRef, onAtRootChan
     if (!window.confirm(`Delete ${file.name}?`)) return
     
     try {
-      const res = await fetch('/api/delete-item', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: file.path })
-      })
-      if (res.ok) {
-        onFileSelect(null)
-        fetchFiles(currentPath)
-      }
+      await api.deleteItem(file.path)
+      onFileSelect(null)
+      fetchFiles(currentPath)
     } catch (err) { console.error('Delete failed:', err) }
   }
 
@@ -246,6 +230,31 @@ const FileExplorer = ({ onFileSelect, isFocused, onFocus, innerRef, onAtRootChan
     </div>
   )
 }
+
+// ── Footer shortcut definitions (static arrays hoisted to module level) ──────
+const SHORTCUTS_VIEWER_VIEW = [
+  ['E',      'Edit'],
+  ['Enter',  'Fullscreen'],
+  ['Esc',    'Close'],
+]
+
+const SHORTCUTS_VIEWER_FULLSCREEN = [
+  ['E',          'Edit'],
+  ['Enter / Esc', 'Exit fullscreen'],
+]
+
+const SHORTCUTS_VIEWER_EDIT = [
+  ['Tab',    'Indent'],
+  ['Ctrl+S', 'Save'],
+  ['Esc',    'Exit edit'],
+]
+
+const SHORTCUTS_VIEWER_EDIT_MD = [
+  ['Tab',    'Indent'],
+  ['Ctrl+P', 'Edit/Preview'],
+  ['Ctrl+S', 'Save'],
+  ['Esc',    'Exit edit'],
+]
 
 const FileViewer = ({
   selectedFile, content, isEditing, editContent, isDirty, isMd,
@@ -431,13 +440,10 @@ const FileViewer = ({
 }
 
 function App() {
-  const terminalRef = useRef(null)
   const explorerRef = useRef(null)
   const viewerRef = useRef(null)
-  const xtermInstance = useRef(null)
-  const fitAddonRef = useRef(null)
 
-  // Refs for stale closure access (terminal key handler + global keydown registered once on mount)
+  // Refs for stale closure access
   const selectedFileRef = useRef(null)
   const viewerFullscreenRef = useRef(false)
   const isEditingRef = useRef(false)
@@ -446,16 +452,17 @@ function App() {
   const requireCleanRef = useRef(null)
   const handleEscapeKeyRef = useRef(null)
 
+  const [rootReady, setRootReady] = useState(false)
   const [selectedFile, setSelectedFile] = useState(null)
   const [fileContent, setFileContent] = useState('')
   const [isEditing, setIsEditing] = useState(false)
   const [editContent, setEditContent] = useState('')
   const [pendingAction, setPendingAction] = useState(null)
-  const [connected, setConnected] = useState(false)
-  const [activeFocus, setActiveFocus] = useState('terminal')
+  const [activeFocus, setActiveFocus] = useState('explorer')
   const [sidebarVisible, setSidebarVisible] = useState(true)
   const [viewerFullscreen, setViewerFullscreen] = useState(false)
   const [explorerAtRoot, setExplorerAtRoot] = useState(true)
+  const [refreshKey, setRefreshKey] = useState(0)
 
   // Keep refs current on every render (synchronous, no useEffect lag)
   selectedFileRef.current = selectedFile
@@ -471,32 +478,24 @@ function App() {
     if (!selectedFile || selectedFile.isDirectory) { setFileContent(''); return; }
     setIsEditing(false);
     setEditContent('');
-    fetch(`/api/file-content?path=${encodeURIComponent(selectedFile.path)}`)
-      .then(r => r.json())
+    api.readFile(selectedFile.path)
       .then(d => setFileContent(d.content || ''))
       .catch(() => setFileContent('Error loading file content.'));
   }, [selectedFile])
 
   const handleFocusChange = useCallback((target) => {
     setActiveFocus(target);
-    if (target === 'explorer' && explorerRef.current) explorerRef.current.focus();
-    else if (target === 'viewer' && viewerRef.current) viewerRef.current.focus();
-    else if (target === 'terminal' && xtermInstance.current) xtermInstance.current.focus();
-  }, []);
-
-  const scheduleFit = useCallback((delay = 50) => {
-    setTimeout(() => fitAddonRef.current?.fit(), delay);
+    setTimeout(() => {
+      if (target === 'explorer' && explorerRef.current) explorerRef.current.focus();
+      else if (target === 'viewer' && viewerRef.current) viewerRef.current.focus();
+    }, 10);
   }, []);
 
   const saveFile = useCallback(async () => {
     if (!selectedFileRef.current) return;
     const content = editContentRef.current;
     try {
-      await fetch('/api/file-write', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: selectedFileRef.current.path, content })
-      });
+      await api.writeFile(selectedFileRef.current.path, content);
       setFileContent(content);
     } catch (e) { console.error('Save failed:', e); }
   }, []);
@@ -510,19 +509,17 @@ function App() {
         setFileContent('');
         setViewerFullscreen(false);
         handleFocusChange('explorer');
-        scheduleFit();
         break;
       case 'changeFile':
         setSelectedFile(action.file);
         handleFocusChange('viewer');
-        scheduleFit();
         break;
       case 'exitEdit':
         break;
       default:
         console.warn('Unknown action type:', action.type);
     }
-  }, [handleFocusChange, scheduleFit]);
+  }, [handleFocusChange]);
 
   const requireClean = useCallback((action) => {
     const dirty = isEditingRef.current && editContentRef.current !== fileContentRef.current;
@@ -535,15 +532,13 @@ function App() {
 
   const toggleViewerFullscreen = useCallback(() => {
     setViewerFullscreen(prev => !prev);
-    scheduleFit();
-  }, [scheduleFit]);
+  }, []);
 
   const handleFileSelect = useCallback((file) => requireClean({ type: 'changeFile', file }), [requireClean]);
 
   const toggleSidebar = useCallback(() => {
     setSidebarVisible(prev => !prev);
-    scheduleFit(350);
-  }, [scheduleFit]);
+  }, []);
 
   const enterEditMode = useCallback(() => {
     setEditContent(fileContentRef.current);
@@ -568,131 +563,100 @@ function App() {
   // Shared Escape handler — used by both terminal key handler and global keydown
   const handleEscapeKey = () => {
     if (isEditingRef.current) { requireCleanRef.current({ type: 'exitEdit' }); return; }
-    if (viewerFullscreenRef.current) { setViewerFullscreen(false); scheduleFit(); return; }
+    if (viewerFullscreenRef.current) { setViewerFullscreen(false); return; }
     if (selectedFileRef.current) { requireCleanRef.current({ type: 'close' }); return; }
     handleFocusChange('explorer');
   };
   handleEscapeKeyRef.current = handleEscapeKey;
 
+  // Check if root is set (via CLI arg) or prompt to pick folder
   useEffect(() => {
-    if (!terminalRef.current) return;
-    const token = new URLSearchParams(window.location.search).get('token')
-    const socket = io({ auth: { token } })
-    const terminal = new Terminal({
-      cursorBlink: true,
-      fontFamily: 'MesloLGS NF, monospace',
-      fontSize: 14,
-      theme: { background: '#1e1e1e', foreground: '#ffffff', cursor: '#ffffff' },
-      allowProposedApi: true
-    })
-    xtermInstance.current = terminal
-    const fitAddon = new FitAddon()
-    fitAddonRef.current = fitAddon
-    const unicode11Addon = new Unicode11Addon()
-    terminal.loadAddon(fitAddon)
-    terminal.loadAddon(unicode11Addon)
-    terminal.unicode.activeVersion = '11'
+    api.getRoot()
+      .then(() => setRootReady(true))
+      .catch(() => setRootReady(false))
+  }, [])
 
-    terminal.open(terminalRef.current)
-    fitAddon.fit()
-
-    terminal.attachCustomKeyEventHandler((e) => {
-      if (e.type === 'keydown') {
-        if (e.ctrlKey && e.key === 'b') { toggleSidebar(); return false; }
-        if (e.ctrlKey && (e.key === '`' || e.code === 'Backquote')) { handleFocusChange('terminal'); return false; }
-        if (e.key === 'Escape') { handleEscapeKeyRef.current(); return false; }
+  // File watcher: auto-refresh on file changes
+  useEffect(() => {
+    const unlistenRef = { current: null }
+    let unmounted = false
+    api.onFileChanged((payload) => {
+      setRefreshKey(k => k + 1)
+      if (selectedFileRef.current && payload.paths?.includes(selectedFileRef.current.path)) {
+        if (!isEditingRef.current) {
+          api.readFile(selectedFileRef.current.path)
+            .then(d => setFileContent(d.content || ''))
+            .catch(() => {})
+        }
       }
-      return true;
-    });
-
-    socket.on('connect', () => {
-      setConnected(true)
-      socket.emit('terminal-resize', { cols: terminal.cols, rows: terminal.rows })
-      socket.emit('start-command', 'shell')
+    }).then(fn => {
+      if (unmounted) fn()
+      else unlistenRef.current = fn
     })
-    socket.on('terminal-data', (data) => terminal.write(data))
-    terminal.onData((data) => socket.emit('terminal-input', data))
-
-    const onResize = () => { fitAddon.fit(); socket.emit('terminal-resize', { cols: terminal.cols, rows: terminal.rows }); };
-    const resizeObserver = new ResizeObserver(onResize);
-    resizeObserver.observe(terminalRef.current);
-    terminal.focus()
-    return () => { resizeObserver.disconnect(); socket.disconnect(); terminal.dispose(); }
-  }, [handleFocusChange, toggleSidebar])
+    return () => { unmounted = true; unlistenRef.current?.() }
+  }, [])
 
   useEffect(() => {
     const handleGlobalKeyDown = (e) => {
-      if (e.ctrlKey && e.key === 'b') { e.preventDefault(); toggleSidebar(); }
-      else if (e.ctrlKey && (e.key === '`' || e.code === 'Backquote')) { e.preventDefault(); handleFocusChange('terminal'); }
+      const key = resolveKey(e.key);
+      if (e.ctrlKey && key === 'b') { e.preventDefault(); toggleSidebar(); }
       else if (e.key === 'Escape') { e.preventDefault(); handleEscapeKeyRef.current(); }
     };
     window.addEventListener('keydown', handleGlobalKeyDown)
     return () => window.removeEventListener('keydown', handleGlobalKeyDown)
-  }, [handleFocusChange, toggleSidebar])
+  }, [toggleSidebar])
 
   const isMd = selectedFile?.name.split('.').pop() === 'md'
 
-  // ── Footer shortcut hints ─────────────────────────────────────────────────
-  // Edit these arrays to change what's shown in the footer for each pane.
-  // Order: action keys first → Enter (if any) → Esc last.
-  // Each entry: ['Key label', 'Description']
-
-  const SHORTCUTS_EXPLORER = [
-    ['↑↓',                       'Navigate'],
-    ...(!explorerAtRoot ? [['⌫', 'Parent dir']] : []),
-    ['A/Shift+A',                'New File/Dir'],
-    ['R',                        'Rename'],
-    ['Del',                      'Delete'],
-    ['C',                        'Copy path'],
-    ['Ctrl+`',                   'Terminal'],
-    ['Enter',                    'Open'],       // Enter last (no Esc here)
-  ]
-
-  const SHORTCUTS_VIEWER_VIEW = [
-    ['E',      'Edit'],
-    ['Enter',  'Fullscreen'], // Enter second-to-last
-    ['Esc',    'Close'],      // Esc last
-  ]
-
-  const SHORTCUTS_VIEWER_FULLSCREEN = [
-    ['E',          'Edit'],
-    ['Enter / Esc', 'Exit fullscreen'],
-  ]
-
-  const SHORTCUTS_VIEWER_EDIT = [
-    ['Tab',    'Indent'],
-    ['Ctrl+S', 'Save'],
-    ['Esc',    'Exit edit'],  // Esc last
-  ]
-
-  const SHORTCUTS_VIEWER_EDIT_MD = [
-    ['Tab',    'Indent'],
-    ['Ctrl+P', 'Edit/Preview'], // markdown only
-    ['Ctrl+S', 'Save'],
-    ['Esc',    'Exit edit'],  // Esc last
-  ]
-
-  const SHORTCUTS_TERMINAL = [
-    ['Ctrl+B', 'Sidebar'],
-    ['Ctrl+`', 'Terminal'],
-    ['Esc',    'Close'],      // Esc last
-  ]
-
-  // ─────────────────────────────────────────────────────────────────────────
-
-  const footerShortcuts = (() => {
-    if (activeFocus === 'explorer') return SHORTCUTS_EXPLORER
+  const footerShortcuts = useMemo(() => {
     if (activeFocus === 'viewer') {
       if (isEditing) return isMd ? SHORTCUTS_VIEWER_EDIT_MD : SHORTCUTS_VIEWER_EDIT
       if (viewerFullscreen) return SHORTCUTS_VIEWER_FULLSCREEN
       return SHORTCUTS_VIEWER_VIEW
     }
-    return SHORTCUTS_TERMINAL
-  })()
+    return [
+      ['↑↓',                       'Navigate'],
+      ...(!explorerAtRoot ? [['⌫', 'Parent dir']] : []),
+      ['A/Shift+A',                'New File/Dir'],
+      ['R',                        'Rename'],
+      ['Del',                      'Delete'],
+      ['C',                        'Copy path'],
+      ['Ctrl+B',                   'Sidebar'],
+      ['Enter',                    'Open'],
+    ]
+  }, [activeFocus, isEditing, isMd, viewerFullscreen, explorerAtRoot])
 
-  const lineCount = selectedFile && !selectedFile.isDirectory
-    ? (isEditing ? editContent : fileContent).split('\n').length
-    : null
+  const lineCount = useMemo(() => {
+    if (!selectedFile || selectedFile.isDirectory) return null
+    return (isEditing ? editContent : fileContent).split('\n').length
+  }, [selectedFile, isEditing, editContent, fileContent])
+
+  const handlePickFolder = async () => {
+    const path = await api.pickFolder()
+    if (path) {
+      await api.setRoot(path)
+      setRootReady(true)
+    }
+  }
+
+  if (!rootReady) {
+    return (
+      <div style={{
+        width: '100%', height: '100vh', backgroundColor: '#1a1a1a',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '20px'
+      }}>
+        <h1 style={{ color: '#e0e0e0', fontSize: '24px', fontWeight: '300' }}>vibe</h1>
+        <p style={{ color: '#666', fontSize: '14px' }}>프로젝트 폴더를 선택하세요</p>
+        <button onClick={handlePickFolder} style={{
+          background: '#1a3a3a', border: '1px solid #00bcd4', color: '#00bcd4',
+          cursor: 'pointer', padding: '10px 24px', borderRadius: '6px', fontSize: '14px'
+        }}>폴더 열기...</button>
+        <p style={{ color: '#444', fontSize: '12px', marginTop: '20px' }}>
+          또는 CLI에서: <code style={{ color: '#555' }}>vibe /path/to/project</code>
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100vh', backgroundColor: '#1a1a1a', overflow: 'hidden' }}>
@@ -743,6 +707,7 @@ function App() {
               onFileSelect={handleFileSelect}
               isFocused={activeFocus === 'explorer'}
               onAtRootChange={setExplorerAtRoot}
+              refreshKey={refreshKey}
             />
           </div>
         </div>
@@ -770,22 +735,12 @@ function App() {
             </div>
           )}
 
-          <div
-            onClick={() => handleFocusChange('terminal')}
-            style={{
-              flex: 1, padding: '10px', boxSizing: 'border-box', overflow: 'hidden', position: 'relative',
-              border: activeFocus === 'terminal' ? '1px solid #00bcd4' : '1px solid transparent',
-              transition: 'border 0.2s',
-              display: viewerFullscreen ? 'none' : undefined
-            }}
-          >
-            <div style={{ position: 'absolute', top: '5px', right: '15px', zIndex: 10 }}>
-              <span style={{ color: connected ? '#4caf50' : '#f44336', fontSize: '10px' }}>
-                {connected ? '● ONLINE' : '○ OFFLINE'}
-              </span>
+          {/* Viewer takes full remaining space when no terminal */}
+          {!selectedFile && (
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#444', fontSize: '14px' }}>
+              Select a file to view
             </div>
-            <div ref={terminalRef} style={{ width: '100%', height: '100%' }} />
-          </div>
+          )}
         </div>
 
       </div>
