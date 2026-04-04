@@ -12,7 +12,7 @@
 ### 소스에서 빌드
 
 ```bash
-git clone https://github.com/your-username/vibe.git
+git clone https://github.com/solpop-arch/vibe.git
 cd vibe
 cd client && npm install && cd ..
 npx @tauri-apps/cli@^2 build
@@ -43,12 +43,18 @@ vibe
 
 | 기능 | 설명 |
 |---|---|
-| **파일 탐색기** | 프로젝트 파일 트리 탐색, 키보드 네비게이션 |
+| **파일 탐색기** | 프로젝트 파일 트리 탐색, 키보드 네비게이션, Instrument Serif 이탤릭 디렉토리명 |
 | **파일 뷰어** | 마크다운 렌더링, 코드 구문 강조, 줄 번호 |
 | **파일 편집** | 즉석 편집 모드, Ctrl+S 저장 |
-| **파일 감시** | AI가 파일 수정 시 자동 새로고침 |
+| **파일 감시** | AI가 파일 수정 시 자동 새로고침, 변경 뱃지 펄스 애니메이션 |
 | **파일 관리** | 파일/폴더 생성, 이름 변경, 삭제 |
-| **프로젝트 전환** | 런타임에 프로젝트 폴더 변경 |
+| **프로젝트 대시보드** | 언어 분포 바, 문서 그룹핑, 최근 변경 파일 |
+| **멀티 프로젝트** | 여러 프로젝트 등록, Cmd+1-9 또는 하단 드롭다운으로 전환 |
+| **다크 모드** | 따뜻한 다크 테마 (월넛 톤), Ctrl+Shift+L로 전환 |
+
+## 디자인
+
+따뜻하고 미니멀한 미학. 오래된 종이 느낌의 라이트 테마, 따뜻한 월넛 톤의 다크 테마. 활성 상태에 러스트/엠버 액센트. 타이포그래피: Instrument Serif (디렉토리), Geist (UI), JetBrains Mono (코드). 전체 스펙은 [DESIGN.md](./DESIGN.md) 참고.
 
 ## 단축키
 
@@ -60,6 +66,8 @@ vibe
 | `E` | 편집 모드 |
 | `Ctrl+S` | 저장 |
 | `Ctrl+B` | 사이드바 토글 |
+| `Ctrl+Shift+L` | 다크 모드 전환 |
+| `Cmd+1-9` | 프로젝트 전환 |
 | `A` / `Shift+A` | 새 파일 / 새 폴더 |
 | `R` | 이름 변경 |
 | `Del` | 삭제 |
@@ -77,15 +85,6 @@ vibe
 | 코드 하이라이트 | react-syntax-highlighter (Prism) |
 | 파일 감시 | notify crate (OS 네이티브) |
 
-## 로드맵
-
-- [x] **1단계**: 파일 트리 + 뷰어 + 파일 감시
-- [ ] **2단계**: Git 연동 + 프로젝트 스위처 + diff 뷰
-- [ ] **3단계**: 대시보드, 템플릿, UI 다듬기 → v1.0
-
 ## 라이선스
 
 MIT
-
----
-*Created with vibe-coding.*

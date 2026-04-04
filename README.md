@@ -55,12 +55,18 @@ vibe
 
 | Feature | Description |
 |---|---|
-| **File Explorer** | Project file tree browsing with keyboard navigation |
+| **File Explorer** | Project file tree with keyboard navigation, Instrument Serif italic directory names |
 | **File Viewer** | Markdown rendering, syntax highlighting, line numbers |
 | **File Editing** | Inline edit mode, Ctrl+S to save |
-| **File Watching** | Auto-refresh on file changes (150ms debounce) |
+| **File Watching** | Auto-refresh on file changes (150ms debounce), change badges with pulse animation |
 | **File Operations** | Create, rename, delete files and folders |
-| **Project Switching** | Change project folder at runtime |
+| **Project Dashboard** | Language distribution bar, document grouping, recently changed files |
+| **Multi-Project** | Register multiple projects, switch with Cmd+1-9 or footer dropdown |
+| **Dark Mode** | Warm dark theme (walnut, not cold slate), toggle with Ctrl+Shift+L |
+
+## Design
+
+Warm, minimal aesthetic. Aged-paper light theme, warm-walnut dark theme. Rust/ember accent for active states. Typography: Instrument Serif (directories), Geist (UI), JetBrains Mono (code). See [DESIGN.md](./DESIGN.md) for full spec.
 
 ## Keyboard Shortcuts
 
@@ -72,6 +78,8 @@ vibe
 | `E` | Edit mode |
 | `Ctrl+S` | Save |
 | `Ctrl+B` | Toggle sidebar |
+| `Ctrl+Shift+L` | Toggle dark mode |
+| `Cmd+1-9` | Switch between projects |
 | `A` / `Shift+A` | New file / New folder |
 | `R` | Rename |
 | `Del` | Delete |
@@ -108,18 +116,10 @@ vibe/
 │   │   ├── App.jsx      # Main UI component
 │   │   └── api.js       # Tauri IPC layer
 │   └── package.json
+├── DESIGN.md            # Design system spec
 └── README.md
 ```
-
-## Roadmap
-
-- [x] **Phase 1**: File tree + viewer + file watching
-- [ ] **Phase 2**: Git integration + project switcher + diff view
-- [ ] **Phase 3**: Dashboard, templates, UI polish → v1.0
 
 ## License
 
 MIT
-
----
-*Created with vibe-coding.*
