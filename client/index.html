@@ -4,22 +4,60 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>vibe - Web UI</title>
+    <title>Vibe</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
-      @font-face {
-        font-family: 'MesloLGS NF';
-        src: local('MesloLGS NF'), local('MesloLGS-NF'), local('Meslo LGS NF');
+      :root {
+        --bg:         #F5F0E8;
+        --surface:    #FDFAF4;
+        --surface-2:  #EDE8DC;
+        --text:       #1A1612;
+        --muted:      #8C8070;
+        --accent:     #C85A2A;
+        --accent-sub: #F0DDD2;
+        --border:     #D9D2C2;
+        --success:    #3A7D52;
+        --warning:    #B07A2A;
+        --error:      #9B3030;
       }
+      [data-theme="dark"] {
+        --bg:         #12100E;
+        --surface:    #1C1916;
+        --surface-2:  #242018;
+        --text:       #EDE5D8;
+        --muted:      #7A6F60;
+        --accent:     #E8703A;
+        --accent-sub: #2A1C12;
+        --border:     #2E2820;
+        --success:    #4A9E68;
+        --warning:    #C89040;
+        --error:      #C04848;
+      }
+      @keyframes badge-pulse {
+        0%, 100% { opacity: 1; }
+        50%       { opacity: 0.6; }
+      }
+      *, *::before, *::after { box-sizing: border-box; }
       body, html, #root {
-        margin: 0;
-        padding: 0;
-        height: 100%;
-        width: 100%;
-        background-color: #1e1e1e;
-        color: white;
+        margin: 0; padding: 0;
+        height: 100%; width: 100%;
+        background-color: var(--bg);
+        color: var(--text);
         overflow: hidden;
-        font-family: 'MesloLGS NF', sans-serif;
+        font-family: 'Geist', 'Inter', -apple-system, sans-serif;
+        font-size: 13px;
+        line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
       }
+      button, input { font-family: inherit; font-size: inherit; }
+      ::-webkit-scrollbar { width: 5px; height: 5px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+      ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+      ::selection { background: var(--accent-sub); color: var(--text); }
     </style>
   </head>
   <body>
