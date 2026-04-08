@@ -5,6 +5,7 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { oneLight }    from 'react-syntax-highlighter/dist/esm/styles/prism'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import rehypeRaw from 'rehype-raw'
 
 // ── Korean keyboard ───────────────────────────────────────────────────────────
 const KEY_ALIASES = {
@@ -81,7 +82,7 @@ const MarkdownView = ({ content, isDark }) => {
   const components = useMemo(() => makeMarkdownComponents(isDark), [isDark])
   return (
     <div style={{ color:'var(--text)', lineHeight:'1.75', fontSize:'14px', maxWidth:'72ch' }}>
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>{content}</ReactMarkdown>
+      <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]} components={components}>{content}</ReactMarkdown>
     </div>
   )
 }
@@ -96,10 +97,10 @@ function formatAge(ms) {
   return `${Math.floor(m / 60)}h ago`
 }
 
-function StatCard({ value, label, accent }) {
+function StatCard({ value, label }) {
   return (
     <div style={{ background:'var(--surface-2)', border:'1px solid var(--border)', borderRadius:'6px', padding:'8px 16px' }}>
-      <div style={{ fontFamily:FONT_MONO, fontSize:'20px', fontWeight:500, color: accent ? 'var(--accent)' : 'var(--text)', lineHeight:1.2 }}>{value}</div>
+      <div style={{ fontFamily:FONT_MONO, fontSize:'20px', fontWeight:500, color:'var(--text)', lineHeight:1.2 }}>{value}</div>
       <div style={{ fontSize:'10px', color:'var(--muted)', marginTop:'2px', textTransform:'uppercase', letterSpacing:'0.06em' }}>{label}</div>
     </div>
   )
@@ -110,7 +111,8 @@ const DIVIDER       = { border:'none', borderTop:'1px solid var(--border)', marg
 
 function ProjectDashboard({ data, recentChanges, onFileOpen }) {
   if (!data) return <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100%', color:'var(--muted)', fontSize:'13px' }}>Loading…</div>
-  const { projectName, projectPath, totalFiles, langStats, docGroups } = data
+  const { projectName, projectPath, totalFiles, totalFolders, langStats, docGroups } = data
+  const totalDocs = docGroups.reduce((sum, g) => sum + g.items.length, 0)
 
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', overflowY:'auto', padding:'32px 48px', gap:'32px' }}>
@@ -125,9 +127,9 @@ function ProjectDashboard({ data, recentChanges, onFileOpen }) {
         <div style={SECTION_LABEL}>Project</div>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:'8px' }}>
           <StatCard value={totalFiles} label="Files" />
-          <StatCard value="—" label="Lines" />
+          <StatCard value={totalFolders} label="Folders" />
           <StatCard value={langStats.length} label="Languages" />
-          <StatCard value="●" label="Watching" accent />
+          <StatCard value={totalDocs} label="Docs" />
         </div>
       </div>
 
@@ -301,7 +303,8 @@ const FileExplorer = ({ onFileSelect, isFocused, onFocus, innerRef, onAtRootChan
     }
   }, [expandedDirs, childrenCache])
 
-  // Naming
+  // Focus + initial selection on open. naming.value intentionally excluded — re-running
+  // setSelectionRange on each keystroke would wipe typed input.
   useEffect(() => {
     if (naming.active && inputRef.current) {
       inputRef.current.focus()
@@ -310,7 +313,8 @@ const FileExplorer = ({ onFileSelect, isFocused, onFocus, innerRef, onAtRootChan
         inputRef.current.setSelectionRange(0, dot > 0 ? dot : naming.value.length)
       }
     }
-  }, [naming.active, naming.type, naming.value])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [naming.active, naming.type])
 
   const handleNamingSubmit = async (e) => {
     e.preventDefault()
@@ -702,14 +706,15 @@ function App() {
       const rootData = await api.listFiles('')
       const rootItems = rootData.items || []
       const allFiles = []
-      rootItems.forEach(item => { if (!item.isDirectory) allFiles.push(item) })
+      let totalFolders = 0
+      rootItems.forEach(item => { if (!item.isDirectory) allFiles.push(item); else totalFolders++ })
       const subDirScans = []
       await Promise.all(rootItems.filter(f => f.isDirectory).map(async (dir) => {
         try {
           const sub = await api.listFiles(dir.path)
           ;(sub.items || []).forEach(item => {
             if (!item.isDirectory) allFiles.push({ ...item, parentDir: dir.name })
-            else if (DOC_FOLDERS.has(dir.name.toLowerCase())) subDirScans.push({ dirPath: item.path, parentDir: dir.name + '/' + item.name })
+            else { totalFolders++; if (DOC_FOLDERS.has(dir.name.toLowerCase())) subDirScans.push({ dirPath: item.path, parentDir: dir.name + '/' + item.name }) }
           })
         } catch (_) {}
       }))
@@ -757,7 +762,7 @@ function App() {
       Object.entries(extCounts).forEach(([ext, count]) => { const lang = EXT_TO_LANG[ext]; if (lang) langCounts[lang] = (langCounts[lang] || 0) + count })
       const totalLang = Object.values(langCounts).reduce((a, b) => a + b, 0) || 1
       const langStats = Object.entries(langCounts).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([name, count]) => ({ name, pct: Math.round(count / totalLang * 100), color: LANG_COLORS[name] || LANG_COLORS.Other }))
-      setDashboardData({ projectName: rootData.currentPath?.split('/').pop() || 'project', projectPath: rootData.currentPath || '', totalFiles: allFiles.length, langStats, docGroups })
+      setDashboardData({ projectName: rootData.currentPath?.split('/').pop() || 'project', projectPath: rootData.currentPath || '', totalFiles: allFiles.length, totalFolders, langStats, docGroups })
     } catch (e) { console.error('Dashboard load failed:', e) }
   }, [])
 
