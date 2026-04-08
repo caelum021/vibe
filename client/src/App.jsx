@@ -1,11 +1,28 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
+import { Prism as SyntaxHighlighter, createElement as createHlElement } from 'react-syntax-highlighter'
+import { List as VirtualList } from 'react-window'
 import * as api from './api'
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { oneLight }    from 'react-syntax-highlighter/dist/esm/styles/prism'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
+
+// font-size 12.5px × 1.76 ≈ 22. Coupled to textarea + virtualized rows — update together.
+const LINE_HEIGHT_PX = 22
+const EDIT_PADDING_PX = 16
+// Fixed gutter width — covers up to 99,999 lines, well above the 1MB read cap.
+const LINE_NUM_WIDTH = '5ch'
+
+// Disambiguate readFile errors so the user sees why a file isn't displayed.
+const formatReadError = (err) => {
+  const msg = String(err?.message ?? err ?? '')
+  if (/too large/i.test(msg)) {
+    return '⚠ This file is larger than 1MB and cannot be displayed.\n\nVibe limits in-app file viewing to 1MB to keep the UI responsive.\nOpen it in a dedicated editor instead.'
+  }
+  if (/binary/i.test(msg)) return '⚠ Binary file — not displayed.'
+  return `Error loading file content.\n\n${msg}`
+}
 
 // ── Korean keyboard ───────────────────────────────────────────────────────────
 const KEY_ALIASES = {
@@ -19,6 +36,26 @@ const resolveKey = (key) => KEY_ALIASES[key] ?? key
 const FONT_MONO  = "'JetBrains Mono',monospace"
 const FONT_SERIF = "'Instrument Serif',serif"
 const FONT_UI    = "'Geist',sans-serif"
+
+// ── Virtualized code row (hoisted to avoid per-row style allocation while scrolling) ──
+const CODE_ROW_STYLE = {
+  width: 'max-content', minWidth: '100%', display: 'flex', whiteSpace: 'pre',
+  fontFamily: FONT_MONO, fontSize: '12.5px', lineHeight: `${LINE_HEIGHT_PX}px`, letterSpacing: '0.01em',
+}
+const CODE_ROW_LINENUM_STYLE = {
+  display: 'inline-block', width: LINE_NUM_WIDTH, paddingRight: '12px',
+  color: 'var(--border)', userSelect: 'none', flexShrink: 0, textAlign: 'right', boxSizing: 'border-box',
+  position: 'sticky', left: 0, background: 'var(--surface)', zIndex: 1,
+}
+const CODE_ROW_TOKEN_STYLE = { flex: '0 0 auto' }
+const CodeRow = ({ index, style, rows, stylesheet, useInlineStyles }) => (
+  <div style={{ ...style, ...CODE_ROW_STYLE }}>
+    <span style={CODE_ROW_LINENUM_STYLE}>{index + 1}</span>
+    <span style={CODE_ROW_TOKEN_STYLE}>
+      {createHlElement({ node: rows[index], stylesheet, useInlineStyles, key: index })}
+    </span>
+  </div>
+)
 
 // ── File icons (matching prototype: jsx:'⚛' js:'⚡' ts:'⬡' rs:'⬢' …) ────────
 const ICON_MAP = {
@@ -534,6 +571,13 @@ const FileViewer = ({
   const ext = selectedFile?.name.split('.').pop()?.toLowerCase() ?? ''
   const langBadge = EXT_TO_DISPLAY[ext] || ext || '—'
 
+  // textarea padding-top offsets the line-number gutter so line "1" aligns with the first text line.
+  const handleTextareaScroll = useCallback((e) => {
+    if (lineNumbersRef.current) {
+      lineNumbersRef.current.style.transform = `translateY(${EDIT_PADDING_PX - e.currentTarget.scrollTop}px)`
+    }
+  }, [])
+
   useEffect(() => { setMdTab('edit') }, [selectedFile])
   useEffect(() => { if (isEditing && textareaRef.current) textareaRef.current.focus() }, [isEditing])
 
@@ -568,8 +612,30 @@ const FileViewer = ({
 
   const showEditPane    = isEditing && (!isMd || mdTab === 'edit')
   const showPreviewPane = isEditing && isMd && mdTab === 'preview'
-  const lineCount       = (isEditing ? editContent : content).split('\n').length
+  const isCodeView      = !!selectedFile && !isMd && !showEditPane && !showPreviewPane
+  const isFlexLayout    = showEditPane || isCodeView
+  const activeContent   = isEditing ? editContent : content
+  const lineCount       = useMemo(() => activeContent.split('\n').length, [activeContent])
+  const lineNumbersText = useMemo(
+    () => Array.from({ length: lineCount }, (_, i) => String(i + 1)).join('\n'),
+    [lineCount]
+  )
   const syntaxStyle     = isDark ? vscDarkPlus : oneLight
+
+  useEffect(() => {
+    if (lineNumbersRef.current) lineNumbersRef.current.style.transform = `translateY(${EDIT_PADDING_PX}px)`
+  }, [selectedFile, isEditing])
+
+  const codeRenderer = useCallback(({ rows, stylesheet, useInlineStyles }) => (
+    <VirtualList
+      rowCount={rows.length}
+      rowHeight={LINE_HEIGHT_PX}
+      rowProps={{ rows, stylesheet, useInlineStyles }}
+      rowComponent={CodeRow}
+      overscanCount={5}
+      style={{ overflowX: 'auto' }}
+    />
+  ), [])
 
   return (
     <div ref={innerRef} tabIndex={0} onFocus={onFocus} style={{ display:'flex', flexDirection:'column', height:'100%', outline:'none', background:'var(--surface)' }}>
@@ -607,26 +673,50 @@ const FileViewer = ({
         </div>
       </div>
 
-      {/* Content */}
-      <div style={{ flex:1, overflow: showEditPane ? 'hidden' : 'auto', padding: showEditPane ? '0' : isMd ? '24px 32px' : '16px 0', display: showEditPane ? 'flex' : 'block', flexDirection:'column' }}>
+      {/* Content — code viewer & edit pane fill via flex; markdown flows in scroll container. */}
+      <div style={{ flex:1, overflow: isFlexLayout ? 'hidden' : 'auto', padding: isFlexLayout ? '0' : isMd ? '24px 32px' : '0', display: isFlexLayout ? 'flex' : 'block', flexDirection:'column', minHeight:0 }}>
         {selectedFile && (
           showEditPane ? (
-            <div style={{ display:'flex', flex:1, overflow:'hidden' }}>
-              <div ref={lineNumbersRef} style={{ padding:'16px 16px', background:'var(--surface)', color:'var(--border)', fontSize:'12px', lineHeight:'1.75', fontFamily:FONT_MONO, textAlign:'right', userSelect:'none', overflowY:'hidden', flexShrink:0, borderRight:'1px solid var(--border)', minWidth:'44px', whiteSpace:'pre' }}>
-                {editContent.split('\n').map((_, i) => <div key={i}>{i + 1}</div>)}
-              </div>
+            <div style={{ display:'flex', flex:1, overflow:'hidden', minHeight:0 }}>
+              <pre ref={lineNumbersRef} style={{
+                margin: 0,
+                padding: `0 12px 0 0`,
+                width: LINE_NUM_WIDTH,
+                flexShrink: 0,
+                overflow: 'hidden',
+                borderRight: '1px solid var(--border)',
+                background: 'var(--surface)',
+                fontFamily: FONT_MONO,
+                fontSize: '12.5px',
+                lineHeight: `${LINE_HEIGHT_PX}px`,
+                color: 'var(--border)',
+                textAlign: 'right',
+                userSelect: 'none',
+                whiteSpace: 'pre',
+                transform: `translateY(${EDIT_PADDING_PX}px)`,
+                willChange: 'transform',
+              }}>{lineNumbersText}</pre>
               <textarea ref={textareaRef} value={editContent} onChange={e => onEditContentChange(e.target.value)} onKeyDown={handleTextareaKeyDown}
-                onScroll={e => { if (lineNumbersRef.current) lineNumbersRef.current.scrollTop = e.target.scrollTop }}
+                onScroll={handleTextareaScroll}
                 spellCheck={false}
-                style={{ flex:1, background:'var(--surface)', color:'var(--text)', border:'none', outline:'none', resize:'none', padding:'16px', fontFamily:FONT_MONO, fontSize:'12.5px', lineHeight:'1.75', letterSpacing:'0.01em' }} />
+                wrap="off"
+                style={{ flex:1, background:'var(--surface)', color:'var(--text)', border:'none', outline:'none', resize:'none', padding:`${EDIT_PADDING_PX}px`, fontFamily:FONT_MONO, fontSize:'12.5px', lineHeight:`${LINE_HEIGHT_PX}px`, letterSpacing:'0.01em', whiteSpace:'pre' }} />
             </div>
           ) : showPreviewPane ? (
             <MarkdownView content={editContent} isDark={isDark} />
           ) : isMd ? (
             <MarkdownView content={content} isDark={isDark} />
           ) : (
-            <SyntaxHighlighter language={ext || 'text'} style={syntaxStyle} showLineNumbers lineNumberStyle={{ color:'var(--border)', fontSize:'12px', minWidth:'2.5em', fontFamily:FONT_MONO }}
-              customStyle={{ margin:0, padding:'16px 0', background:'transparent', fontSize:'12.5px', fontFamily:FONT_MONO, letterSpacing:'0.01em', lineHeight:'1.75' }}>
+            <SyntaxHighlighter
+              language={ext || 'text'}
+              style={syntaxStyle}
+              wrapLines
+              renderer={codeRenderer}
+              PreTag="div"
+              CodeTag="div"
+              customStyle={{ margin:0, padding:0, background:'transparent', display:'flex', flexDirection:'column', flex:1, minHeight:0 }}
+              codeTagProps={{ style: { display:'flex', flexDirection:'column', flex:1, minHeight:0 } }}
+            >
               {content}
             </SyntaxHighlighter>
           )
@@ -698,7 +788,9 @@ function App() {
   useEffect(() => {
     if (!selectedFile || selectedFile.isDirectory) { setFileContent(''); return }
     setIsEditing(false); setEditContent('')
-    api.readFile(selectedFile.path).then(d => setFileContent(d.content || '')).catch(() => setFileContent('Error loading file content.'))
+    api.readFile(selectedFile.path)
+      .then(d => setFileContent(d.content || ''))
+      .catch(err => setFileContent(formatReadError(err)))
   }, [selectedFile])
 
   const loadDashboard = useCallback(async () => {
@@ -854,7 +946,7 @@ function App() {
         })
       }
       if (selectedFileRef.current && payload.paths?.includes(selectedFileRef.current.path)) {
-        if (!isEditingRef.current) api.readFile(selectedFileRef.current.path).then(d => setFileContent(d.content || '')).catch(() => {})
+        if (!isEditingRef.current) api.readFile(selectedFileRef.current.path).then(d => setFileContent(d.content || '')).catch(err => setFileContent(formatReadError(err)))
       }
     }).then(fn => { if (unmounted) fn(); else ref.current = fn })
     return () => { unmounted = true; ref.current?.() }
