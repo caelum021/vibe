@@ -79,11 +79,24 @@ const EXT_TO_LANG = { js:'JavaScript', jsx:'JSX', ts:'TypeScript', tsx:'TSX', rs
 const LANG_COLORS = { JSX:'#E8703A', JavaScript:'#F0C945', TypeScript:'#3178C6', TSX:'#61DAFB', Rust:'#9C4221', Python:'#3572A5', CSS:'#563D7C', HTML:'#E34C26', JSON:'#A0A0A0', TOML:'#9C4221', Markdown:'#5D8FBD', Shell:'#89E051', Other:'#8C8070' }
 
 // ── Footer shortcut arrays ────────────────────────────────────────────────────
-const SHORTCUTS_VIEWER_VIEW      = [['E','Edit'], ['Enter','Fullscreen'], ['Esc','Close']]
+const SHORTCUTS_VIEWER_VIEW       = [['E','Edit'], ['Enter','Fullscreen'], ['Esc','Close']]
+const SHORTCUTS_VIEWER_VIEW_DIRTY = [['E','Edit'], ['D','Diff'], ['Enter','Fullscreen'], ['Esc','Close']]
+const SHORTCUTS_VIEWER_DIFF       = [['V','View'], ['Esc','Close']]
 const SHORTCUTS_VIEWER_FULLSCREEN = [['E','Edit'], ['Enter / Esc','Exit fullscreen']]
-const SHORTCUTS_VIEWER_EDIT      = [['Tab','Indent'], ['Ctrl+S','Save'], ['Esc','Exit edit']]
-const SHORTCUTS_VIEWER_EDIT_MD   = [['Tab','Indent'], ['Ctrl+P','Edit/Preview'], ['Ctrl+S','Save'], ['Esc','Exit edit']]
-const SHORTCUTS_EXPLORER         = [['↑↓','Navigate'], ['A','New'], ['R','Rename'], ['Del','Delete'], ['C','Copy'], ['Ctrl+B','Sidebar'], ['Enter','Open/Toggle']]
+const SHORTCUTS_VIEWER_EDIT       = [['Tab','Indent'], ['Ctrl+S','Save'], ['Esc','Exit edit']]
+const SHORTCUTS_VIEWER_EDIT_MD    = [['Tab','Indent'], ['Ctrl+P','Edit/Preview'], ['Ctrl+S','Save'], ['Esc','Exit edit']]
+const SHORTCUTS_EXPLORER          = [['↑↓','Navigate'], ['A','New'], ['R','Rename'], ['Del','Delete'], ['C','Copy'], ['Ctrl+B','Sidebar'], ['Enter','Open/Toggle']]
+
+// ── Git badges ────────────────────────────────────────────────────────────────
+// Two-state badge system: "touched" (modified/added/untracked/renamed) vs "deleted".
+// Glyph is uniform; color carries meaning. Clean/ignored files get no badge.
+const GIT_BADGE_TOUCHED = { glyph: '●', color: 'var(--accent)' }
+const GIT_BADGE_DELETED = { glyph: '●', color: 'var(--muted)' }
+const gitBadgeFor = (state) => {
+  if (!state) return null
+  if (state === 'deleted') return GIT_BADGE_DELETED
+  return GIT_BADGE_TOUCHED
+}
 
 // ── Markdown ──────────────────────────────────────────────────────────────────
 function makeMarkdownComponents(isDark) {
@@ -113,6 +126,133 @@ function makeMarkdownComponents(isDark) {
     td: ({children}) => <td style={{ padding:'5px 8px', borderBottom:'1px solid var(--border)' }}>{children}</td>,
     tr: ({children}) => <tr>{children}</tr>,
   }
+}
+
+// ── Diff view ─────────────────────────────────────────────────────────────────
+// Flatten hunks into a row list: [ {kind:'header', text}, {kind:'line', ...}, ... ]
+function flattenHunks(hunks) {
+  const rows = []
+  for (const h of hunks) {
+    rows.push({ kind: 'header', text: `@@ -${h.oldStart},${h.oldLines} +${h.newStart},${h.newLines} @@` })
+    for (const l of h.lines) rows.push({ kind: 'line', line: l })
+  }
+  return rows
+}
+
+// Build side-by-side pairs from the linear add/del/context sequence.
+function pairHunks(hunks) {
+  const pairs = []
+  for (const h of hunks) {
+    pairs.push({ kind: 'header', text: `@@ -${h.oldStart},${h.oldLines} +${h.newStart},${h.newLines} @@` })
+    let i = 0
+    const lines = h.lines
+    while (i < lines.length) {
+      const l = lines[i]
+      if (l.kind === 'context') {
+        pairs.push({ kind: 'pair', left: l, right: l })
+        i++
+      } else if (l.kind === 'del') {
+        // Pair consecutive dels with following adds (GitHub style).
+        const dels = []
+        while (i < lines.length && lines[i].kind === 'del') { dels.push(lines[i]); i++ }
+        const adds = []
+        while (i < lines.length && lines[i].kind === 'add') { adds.push(lines[i]); i++ }
+        const n = Math.max(dels.length, adds.length)
+        for (let k = 0; k < n; k++) pairs.push({ kind: 'pair', left: dels[k] || null, right: adds[k] || null })
+      } else if (l.kind === 'add') {
+        pairs.push({ kind: 'pair', left: null, right: l })
+        i++
+      } else {
+        i++
+      }
+    }
+  }
+  return pairs
+}
+
+const DIFF_ROW_STYLE = {
+  display: 'flex', whiteSpace: 'pre', fontFamily: FONT_MONO, fontSize: '12.5px',
+  lineHeight: `${LINE_HEIGHT_PX}px`, letterSpacing: '0.01em', minWidth: '100%', width: 'max-content',
+}
+const DIFF_GUTTER = {
+  display: 'inline-block', width: '3.5ch', paddingRight: '6px', textAlign: 'right',
+  color: 'var(--muted)', fontSize: '11px', flexShrink: 0, userSelect: 'none',
+}
+const DIFF_MARK_STYLE = { display: 'inline-block', width: '1.5ch', textAlign: 'center', flexShrink: 0, userSelect: 'none' }
+
+function DiffRowInline({ index, style, rows }) {
+  const row = rows[index]
+  if (row.kind === 'header') {
+    return (
+      <div style={{ ...style, ...DIFF_ROW_STYLE, background: 'var(--surface-2)', color: 'var(--muted)', padding: '0 12px' }}>
+        {row.text}
+      </div>
+    )
+  }
+  const l = row.line
+  let bg = 'transparent', mark = ' ', color = 'var(--text)'
+  if (l.kind === 'add') { bg = 'color-mix(in srgb, #3A7D52 12%, transparent)'; mark = '+'; color = '#3A7D52' }
+  else if (l.kind === 'del') { bg = 'color-mix(in srgb, #9B3030 12%, transparent)'; mark = '−'; color = '#9B3030' }
+  return (
+    <div style={{ ...style, ...DIFF_ROW_STYLE, background: bg }}>
+      <span style={DIFF_GUTTER}>{l.oldNum ?? ''}</span>
+      <span style={DIFF_GUTTER}>{l.newNum ?? ''}</span>
+      <span style={{ ...DIFF_MARK_STYLE, color }}>{mark}</span>
+      <span style={{ flex: '0 0 auto', color: 'var(--text)' }}>{l.content}</span>
+    </div>
+  )
+}
+
+function DiffRowSplit({ index, style, rows }) {
+  const row = rows[index]
+  if (row.kind === 'header') {
+    return (
+      <div style={{ ...style, ...DIFF_ROW_STYLE, background: 'var(--surface-2)', color: 'var(--muted)', padding: '0 12px' }}>
+        {row.text}
+      </div>
+    )
+  }
+  const { left, right } = row
+  const cell = (side) => {
+    if (!side) return { bg: 'var(--surface-2)', num: '', content: '' }
+    if (side.kind === 'add') return { bg: 'color-mix(in srgb, #3A7D52 12%, transparent)', num: side.newNum ?? '', content: side.content }
+    if (side.kind === 'del') return { bg: 'color-mix(in srgb, #9B3030 12%, transparent)', num: side.oldNum ?? '', content: side.content }
+    return { bg: 'transparent', num: (side.oldNum ?? side.newNum) ?? '', content: side.content }
+  }
+  const L = cell(left), R = cell(right)
+  return (
+    <div style={{ ...style, display: 'flex', fontFamily: FONT_MONO, fontSize: '12.5px', lineHeight: `${LINE_HEIGHT_PX}px`, letterSpacing: '0.01em', whiteSpace: 'pre' }}>
+      <div style={{ flex: 1, display: 'flex', background: L.bg, borderRight: '1px solid var(--border)', overflow: 'hidden' }}>
+        <span style={DIFF_GUTTER}>{L.num}</span>
+        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{L.content}</span>
+      </div>
+      <div style={{ flex: 1, display: 'flex', background: R.bg, overflow: 'hidden' }}>
+        <span style={DIFF_GUTTER}>{R.num}</span>
+        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{R.content}</span>
+      </div>
+    </div>
+  )
+}
+
+function DiffView({ diff, sideBySide }) {
+  const rows = useMemo(() => sideBySide ? pairHunks(diff.hunks) : flattenHunks(diff.hunks), [diff, sideBySide])
+  if (diff.isBinary) {
+    return <div style={{ padding: '24px', color: 'var(--muted)', fontFamily: FONT_MONO, fontSize: '12px' }}>Binary file — diff not available.</div>
+  }
+  if (rows.length === 0) {
+    return <div style={{ padding: '24px', color: 'var(--muted)', fontFamily: FONT_MONO, fontSize: '12px' }}>No changes against HEAD.</div>
+  }
+  const RowComp = sideBySide ? DiffRowSplit : DiffRowInline
+  return (
+    <VirtualList
+      rowCount={rows.length}
+      rowHeight={LINE_HEIGHT_PX}
+      rowProps={{ rows }}
+      rowComponent={RowComp}
+      overscanCount={10}
+      style={{ flex: 1, overflowX: 'auto' }}
+    />
+  )
 }
 
 const MarkdownView = ({ content, isDark }) => {
@@ -151,11 +291,19 @@ const isHiddenFile   = (f) => f.name.startsWith('.') || f.parentDir?.startsWith(
 const basenameOf     = (p) => p.split('/').pop()
 const makeRecentEntry = (path, time) => ({ path, name: basenameOf(path), time, lineCount: 0 })
 
-function ProjectDashboard({ data, recentChanges, onFileOpen, onRefresh }) {
+function ProjectDashboard({ data, recentChanges, onFileOpen, onRefresh, gitInfo }) {
   const [refreshing, setRefreshing] = useState(false)
+  const [justRefreshed, setJustRefreshed] = useState(false)
   const handleRefresh = async () => {
     setRefreshing(true)
-    try { await onRefresh() } finally { setRefreshing(false) }
+    setJustRefreshed(false)
+    // Enforce minimum visible spin (~650ms) so the action feels real even on instant responses.
+    const minSpin = new Promise(r => setTimeout(r, 650))
+    try { await Promise.all([onRefresh(), minSpin]) } finally {
+      setRefreshing(false)
+      setJustRefreshed(true)
+      setTimeout(() => setJustRefreshed(false), 900)
+    }
   }
   if (!data) return <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100%', color:'var(--muted)', fontSize:'13px' }}>Loading…</div>
   const { projectName, projectPath, totalFiles, totalFolders, langStats, docGroups } = data
@@ -167,6 +315,16 @@ function ProjectDashboard({ data, recentChanges, onFileOpen, onRefresh }) {
         <div style={{ minWidth:0 }}>
           <div style={{ fontFamily:FONT_SERIF, fontStyle:'italic', fontSize:'26px', fontWeight:400, color:'var(--text)', lineHeight:1.2 }}>{projectName}</div>
           <div style={{ fontFamily:FONT_MONO, fontSize:'11px', color:'var(--muted)', marginTop:'4px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{projectPath}</div>
+          {gitInfo?.isRepo && (
+            <div style={{ fontFamily:FONT_MONO, fontSize:'11px', color:'var(--muted)', marginTop:'6px', display:'flex', alignItems:'center', gap:'8px' }}>
+              <span style={{ color:'var(--text)' }}>⎇ {gitInfo.branch || '(detached)'}</span>
+              {gitInfo.dirtyCount > 0 ? (
+                <span style={{ color:'var(--accent)' }}>● {gitInfo.dirtyCount} file{gitInfo.dirtyCount === 1 ? '' : 's'} changed</span>
+              ) : (
+                <span>clean</span>
+              )}
+            </div>
+          )}
         </div>
         <button
           onClick={handleRefresh}
@@ -175,10 +333,16 @@ function ProjectDashboard({ data, recentChanges, onFileOpen, onRefresh }) {
           onMouseEnter={e => { if (!refreshing) e.currentTarget.style.background = 'var(--surface-2)' }}
           onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
           style={{ background:'transparent', border:'1px solid var(--border)', color:'var(--muted)', cursor: refreshing ? 'default' : 'pointer', padding:'6px', borderRadius:'5px', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, transition:'background 150ms ease-out' }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: refreshing ? 'spin 800ms linear infinite' : 'none' }}>
-            <path d="M21 12a9 9 0 1 1-3-6.7L21 8"/>
-            <path d="M21 3v5h-5"/>
-          </svg>
+          {justRefreshed ? (
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+          ) : (
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: refreshing ? 'spin 650ms linear infinite' : 'none' }}>
+              <path d="M21 12a9 9 0 1 1-3-6.7L21 8"/>
+              <path d="M21 3v5h-5"/>
+            </svg>
+          )}
         </button>
       </div>
 
@@ -224,6 +388,8 @@ function ProjectDashboard({ data, recentChanges, onFileOpen, onRefresh }) {
                 )}
                 {group.items.map(doc => {
                   const icon = getDocIcon(doc.name)
+                  const gitState = gitInfo?.filesByAbs?.get(doc.path)
+                  const badge = gitBadgeFor(gitState)
                   return (
                     <div key={doc.path} onClick={() => onFileOpen(doc)}
                       onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent-sub)'; e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--accent) 20%, transparent)' }}
@@ -234,6 +400,9 @@ function ProjectDashboard({ data, recentChanges, onFileOpen, onRefresh }) {
                         <div style={{ fontSize:'13px', fontWeight:500, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{doc.name}</div>
                         {doc.desc && <div style={{ fontSize:'11px', color:'var(--muted)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{doc.desc}</div>}
                       </div>
+                      {badge && (
+                        <span title={gitState} style={{ fontFamily:FONT_MONO, fontSize:'12px', color:badge.color, flexShrink:0, width:'12px', textAlign:'center', lineHeight:1 }}>{badge.glyph}</span>
+                      )}
                       {doc.lineCount > 0 && (
                         <span style={{ fontFamily:FONT_MONO, fontSize:'10px', color:'var(--muted)', flexShrink:0 }}>{doc.lineCount} lines</span>
                       )}
@@ -256,6 +425,8 @@ function ProjectDashboard({ data, recentChanges, onFileOpen, onRefresh }) {
                 const ext = item.name.split('.').pop()?.toLowerCase() || ''
                 const lang = EXT_TO_LANG[ext] || 'Other'
                 const dotColor = LANG_COLORS[lang] || LANG_COLORS.Other
+                const gitState = gitInfo?.filesByAbs?.get(item.path)
+                const badge = gitBadgeFor(gitState)
                 return (
                 <div key={item.path + i} onClick={() => onFileOpen(item)}
                   onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-2)'}
@@ -263,6 +434,9 @@ function ProjectDashboard({ data, recentChanges, onFileOpen, onRefresh }) {
                   style={{ display:'flex', alignItems:'center', gap:'8px', padding:'5px 8px', borderRadius:'5px', cursor:'pointer', transition:'background 75ms' }}>
                   <span style={{ width:'6px', height:'6px', borderRadius:'50%', background:dotColor, flexShrink:0 }} />
                   <span style={{ fontSize:'13px', color:'var(--text)', flex:1 }}>{item.name}</span>
+                  {badge && (
+                    <span title={gitState} style={{ fontFamily:FONT_MONO, fontSize:'12px', color:badge.color, flexShrink:0, width:'12px', textAlign:'center', lineHeight:1 }}>{badge.glyph}</span>
+                  )}
                   <span style={{ fontFamily:FONT_MONO, fontSize:'10px', color:'var(--muted)' }}>{formatAge(item.time)}</span>
                   {item.lineCount > 0 && <span style={{ fontFamily:FONT_MONO, fontSize:'10px', color:'var(--muted)', minWidth:'52px', textAlign:'right' }}>{item.lineCount} lines</span>}
                 </div>)
@@ -280,7 +454,7 @@ function ProjectDashboard({ data, recentChanges, onFileOpen, onRefresh }) {
 const INDENT = [12, 24, 40, 56, 72]
 const getIndent = (depth) => INDENT[depth] ?? (12 + depth * 16)
 
-const FileExplorer = ({ onFileSelect, isFocused, onFocus, innerRef, onAtRootChange, refreshKey, activeFilePath, changedFiles }) => {
+const FileExplorer = ({ onFileSelect, isFocused, onFocus, innerRef, onAtRootChange, refreshKey, activeFilePath, changedFiles, gitFiles, gitInfo }) => {
   const [rootItems, setRootItems]           = useState([])
   const [expandedDirs, setExpandedDirs]     = useState(new Set())
   const [childrenCache, setChildrenCache]   = useState({})
@@ -311,6 +485,27 @@ const FileExplorer = ({ onFileSelect, isFocused, onFocus, innerRef, onAtRootChan
       setSelectedIndex(visibleItems.length - 1)
     }
   }, [visibleItems.length, selectedIndex])
+
+  // Bubble up: set of directory abs paths that contain at least one dirty file.
+  // Each dirty file contributes all ancestor directories up to (but not including) root.
+  const dirtyDirs = useMemo(() => {
+    const set = new Set()
+    const root = rootPathRef.current
+    if (!gitFiles || gitFiles.size === 0) return set
+    for (const absPath of gitFiles.keys()) {
+      let cur = absPath
+      const lastSlash = cur.lastIndexOf('/')
+      if (lastSlash < 0) continue
+      cur = cur.slice(0, lastSlash)
+      while (cur && cur !== root && !set.has(cur)) {
+        set.add(cur)
+        const s = cur.lastIndexOf('/')
+        if (s < 0) break
+        cur = cur.slice(0, s)
+      }
+    }
+    return set
+  }, [gitFiles])
 
   // Fetch root
   const fetchRoot = useCallback(async () => {
@@ -493,21 +688,36 @@ const FileExplorer = ({ onFileSelect, isFocused, onFocus, innerRef, onAtRootChan
 
   return (
     <div ref={innerRef} tabIndex={0} onFocus={onFocus} style={{ display:'flex', flexDirection:'column', height:'100%', outline:'none', background:'var(--bg)' }}>
-      {/* Header */}
-      <div style={{ padding:'10px 16px 6px', fontSize:'10px', fontWeight:500, color:'var(--muted)', textTransform:'uppercase', letterSpacing:'0.08em', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>
+      {/* Header — actions revealed on hover only */}
+      <div
+        className="explorer-header"
+        style={{ padding:'10px 16px 6px', fontSize:'10px', fontWeight:500, color:'var(--muted)', textTransform:'uppercase', letterSpacing:'0.08em', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}
+      >
         <span>Explorer</span>
-        <div style={{ display:'flex', gap:'2px' }}>
-          {[['New file (A)','+','file'], ['New folder (Shift+A)','⊕','dir']].map(([title, icon, type]) => (
+        <div className="explorer-actions" style={{ display:'flex', gap:'14px' }}>
+          {[['New file (A)', 'file', 'new file'], ['New folder (Shift+A)', 'dir', 'new folder']].map(([title, type, label]) => (
             <button key={type} title={title}
               onClick={() => setNaming({ active:true, type, value:'', oldPath:'', parentPath: rootPathRef.current })}
-              onMouseEnter={e => { e.currentTarget.style.color='var(--text)'; e.currentTarget.style.background='var(--surface-2)' }}
-              onMouseLeave={e => { e.currentTarget.style.color='var(--muted)'; e.currentTarget.style.background='none' }}
-              style={{ background:'none', border:'none', color:'var(--muted)', cursor:'pointer', padding:'2px 4px', borderRadius:'3px', fontSize:'12px', transition:'color 150ms, background 150ms' }}>
-              {icon}
+              onMouseEnter={e => { e.currentTarget.style.color='var(--text)' }}
+              onMouseLeave={e => { e.currentTarget.style.color='var(--muted)' }}
+              style={{ background:'none', border:'none', color:'var(--muted)', cursor:'pointer', padding:0, fontFamily:FONT_SERIF, fontStyle:'italic', fontSize:'13px', letterSpacing:'0', textTransform:'none', lineHeight:1, transition:'color 150ms' }}>
+              {label}
             </button>
           ))}
         </div>
       </div>
+
+      {/* Git status line — hidden entirely when not a repo */}
+      {gitInfo?.isRepo && (
+        <div style={{ padding:'0 16px 8px', fontSize:'11px', fontFamily:FONT_MONO, color:'var(--muted)', display:'flex', alignItems:'center', gap:'8px', flexShrink:0, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+          <span style={{ color:'var(--text)' }} title="Current branch">⎇ {gitInfo.branch || '(detached)'}</span>
+          {gitInfo.dirtyCount > 0 ? (
+            <span style={{ color:'var(--accent)' }}>● {gitInfo.dirtyCount}</span>
+          ) : (
+            <span style={{ color:'var(--muted)' }}>clean</span>
+          )}
+        </div>
+      )}
 
       {/* Tree */}
       <div style={{ flex:1, overflowY:'auto', overflowX:'hidden', paddingBottom:'16px' }}>
@@ -564,6 +774,28 @@ const FileExplorer = ({ onFileSelect, isFocused, onFocus, innerRef, onAtRootChan
                     {item.name}{item.isDirectory ? '/' : ''}
                   </span>
 
+                  {(() => {
+                    // File: direct git state. Directory: bubble up if collapsed and has dirty descendants.
+                    let badge = null
+                    let title = ''
+                    if (item.isDirectory) {
+                      if (!isExpanded && dirtyDirs?.has(item.path)) {
+                        badge = GIT_BADGE_TOUCHED
+                        title = 'contains changes'
+                      }
+                    } else {
+                      const gitState = gitFiles?.get(item.path)
+                      badge = gitBadgeFor(gitState)
+                      title = gitState || ''
+                    }
+                    if (!badge) return null
+                    return (
+                      <span title={title} style={{ fontFamily:FONT_MONO, fontSize:'12px', color:badge.color, flexShrink:0, width:'12px', textAlign:'center', lineHeight:1 }}>
+                        {badge.glyph}
+                      </span>
+                    )
+                  })()}
+
                   {isChanged && (
                     <span style={{ display:'inline-flex', alignItems:'center', gap:'4px', background:'var(--accent-sub)', color:'var(--accent)', fontSize:'10px', padding:'1px 6px', borderRadius:'4px', flexShrink:0, animation:'badge-pulse 2s ease-in-out infinite', border:'1px solid color-mix(in srgb, var(--accent) 25%, transparent)' }}>
                       <span style={{ width:'4px', height:'4px', borderRadius:'50%', background:'var(--accent)' }} />
@@ -588,8 +820,12 @@ const FileViewer = ({
   selectedFile, content, isEditing, editContent, isDirty, isMd, isDark,
   onEditContentChange, onEnterEdit, onExitEdit, onSave,
   isFocused, onFocus, onClose, onToggleFullscreen, innerRef,
+  gitDirty, diffMode, onEnterDiff, onExitDiff,
 }) => {
   const [mdTab, setMdTab] = useState('edit')
+  const [diffData, setDiffData] = useState(null)
+  const [diffError, setDiffError] = useState('')
+  const [diffSideBySide, setDiffSideBySide] = useState(false)
   const textareaRef       = useRef(null)
   const lineNumbersRef    = useRef(null)
   const ext = selectedFile?.name.split('.').pop()?.toLowerCase() ?? ''
@@ -602,18 +838,37 @@ const FileViewer = ({
     }
   }, [])
 
-  useEffect(() => { setMdTab('edit') }, [selectedFile])
+  useEffect(() => { setMdTab('edit'); setDiffData(null); setDiffError(''); setDiffSideBySide(false) }, [selectedFile])
   useEffect(() => { if (isEditing && textareaRef.current) textareaRef.current.focus() }, [isEditing])
+
+  // Fetch diff when entering diff mode (or when file re-changes while already in diff).
+  useEffect(() => {
+    if (!diffMode || !selectedFile) return
+    let cancelled = false
+    setDiffError('')
+    api.gitDiff(selectedFile.path)
+      .then(d => { if (!cancelled) setDiffData(d) })
+      .catch(err => { if (!cancelled) { setDiffError(String(err?.message ?? err)); setDiffData(null) } })
+    return () => { cancelled = true }
+  }, [diffMode, selectedFile, content])
 
   useEffect(() => {
     if (!isFocused || isEditing) return
     const handle = (e) => {
+      const k = resolveKey(e.key).toLowerCase()
+      if (diffMode) {
+        // Shift+D must be checked before plain d (split/inline toggle vs exit).
+        if (e.shiftKey && k === 'd') { e.preventDefault(); setDiffSideBySide(p => !p) }
+        else if (k === 'v' || k === 'd') { e.preventDefault(); onExitDiff() }
+        return
+      }
       if (e.key === 'Enter') { e.preventDefault(); onToggleFullscreen() }
-      if (resolveKey(e.key) === 'e') { e.preventDefault(); onEnterEdit() }
+      else if (k === 'e') { e.preventDefault(); onEnterEdit() }
+      else if (k === 'd' && gitDirty) { e.preventDefault(); onEnterDiff() }
     }
     window.addEventListener('keydown', handle)
     return () => window.removeEventListener('keydown', handle)
-  }, [isFocused, isEditing, onToggleFullscreen, onEnterEdit])
+  }, [isFocused, isEditing, diffMode, gitDirty, onToggleFullscreen, onEnterEdit, onEnterDiff, onExitDiff])
 
   useEffect(() => {
     if (!isEditing || !isMd) return
@@ -634,10 +889,11 @@ const FileViewer = ({
     else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); onExitEdit() }
   }, [editContent, onEditContentChange, onSave, onExitEdit])
 
+  const showDiff        = !!selectedFile && diffMode && !isEditing
   const showEditPane    = isEditing && (!isMd || mdTab === 'edit')
   const showPreviewPane = isEditing && isMd && mdTab === 'preview'
-  const isCodeView      = !!selectedFile && !isMd && !showEditPane && !showPreviewPane
-  const isFlexLayout    = showEditPane || isCodeView
+  const isCodeView      = !!selectedFile && !isMd && !showEditPane && !showPreviewPane && !showDiff
+  const isFlexLayout    = showEditPane || isCodeView || showDiff
   const activeContent   = isEditing ? editContent : content
   const lineCount       = useMemo(() => activeContent.split('\n').length, [activeContent])
   const lineNumbersText = useMemo(
@@ -686,11 +942,27 @@ const FileViewer = ({
               <button onClick={onSave} disabled={!isDirty} style={{ background: isDirty ? 'var(--accent-sub)' : 'transparent', border:`1px solid ${isDirty ? 'var(--accent)' : 'var(--border)'}`, color: isDirty ? 'var(--accent)' : 'var(--muted)', cursor: isDirty ? 'pointer' : 'default', fontSize:'11px', padding:'2px 8px', borderRadius:'4px', fontFamily:FONT_UI }}>Save</button>
               <button onClick={onExitEdit} style={{ background:'none', border:'1px solid var(--border)', color:'var(--muted)', cursor:'pointer', fontSize:'11px', padding:'2px 8px', borderRadius:'4px', fontFamily:FONT_UI }}>View</button>
             </>
+          ) : diffMode ? (
+            <>
+              <button onClick={() => setDiffSideBySide(p => !p)} title="Shift+D"
+                style={{ background: diffSideBySide ? 'var(--accent-sub)' : 'none', border:`1px solid ${diffSideBySide ? 'var(--accent)' : 'var(--border)'}`, color: diffSideBySide ? 'var(--accent)' : 'var(--muted)', cursor:'pointer', fontSize:'11px', padding:'2px 8px', borderRadius:'4px', fontFamily:FONT_UI }}>
+                {diffSideBySide ? 'Split' : 'Inline'}
+              </button>
+              <button onClick={onExitDiff} style={{ background:'none', border:'1px solid var(--border)', color:'var(--muted)', cursor:'pointer', fontSize:'11px', padding:'2px 8px', borderRadius:'4px', fontFamily:FONT_UI }}>V View</button>
+            </>
           ) : (
-            <button onClick={onEnterEdit}
-              onMouseEnter={e => { e.currentTarget.style.background='var(--surface-2)'; e.currentTarget.style.borderColor='var(--accent)'; e.currentTarget.style.color='var(--text)' }}
-              onMouseLeave={e => { e.currentTarget.style.background='none'; e.currentTarget.style.borderColor='var(--border)'; e.currentTarget.style.color='var(--muted)' }}
-              style={{ background:'none', border:'1px solid var(--border)', color:'var(--muted)', cursor:'pointer', fontSize:'11px', padding:'2px 8px', borderRadius:'4px', fontFamily:FONT_UI, transition:'all 150ms' }}>E Edit</button>
+            <>
+              {gitDirty && (
+                <button onClick={onEnterDiff} title="D Diff"
+                  onMouseEnter={e => { e.currentTarget.style.background='var(--surface-2)'; e.currentTarget.style.borderColor='var(--accent)'; e.currentTarget.style.color='var(--text)' }}
+                  onMouseLeave={e => { e.currentTarget.style.background='none'; e.currentTarget.style.borderColor='var(--border)'; e.currentTarget.style.color='var(--muted)' }}
+                  style={{ background:'none', border:'1px solid var(--border)', color:'var(--muted)', cursor:'pointer', fontSize:'11px', padding:'2px 8px', borderRadius:'4px', fontFamily:FONT_UI, transition:'all 150ms' }}>D Diff</button>
+              )}
+              <button onClick={onEnterEdit}
+                onMouseEnter={e => { e.currentTarget.style.background='var(--surface-2)'; e.currentTarget.style.borderColor='var(--accent)'; e.currentTarget.style.color='var(--text)' }}
+                onMouseLeave={e => { e.currentTarget.style.background='none'; e.currentTarget.style.borderColor='var(--border)'; e.currentTarget.style.color='var(--muted)' }}
+                style={{ background:'none', border:'1px solid var(--border)', color:'var(--muted)', cursor:'pointer', fontSize:'11px', padding:'2px 8px', borderRadius:'4px', fontFamily:FONT_UI, transition:'all 150ms' }}>E Edit</button>
+            </>
           )}
           <span style={{ fontFamily:FONT_MONO, fontSize:'11px', color:'var(--muted)', minWidth:'52px', textAlign:'right' }}>{lineCount} lines</span>
           <button onClick={onClose} style={{ background:'transparent', border:'none', color:'var(--muted)', cursor:'pointer', fontSize:'16px', lineHeight:1, padding:'0 2px' }}>&times;</button>
@@ -700,7 +972,11 @@ const FileViewer = ({
       {/* Content — code viewer & edit pane fill via flex; markdown flows in scroll container. */}
       <div style={{ flex:1, overflow: isFlexLayout ? 'hidden' : 'auto', padding: isFlexLayout ? '0' : isMd ? '24px 32px' : '0', display: isFlexLayout ? 'flex' : 'block', flexDirection:'column', minHeight:0 }}>
         {selectedFile && (
-          showEditPane ? (
+          showDiff ? (
+            diffError ? <div style={{ padding:'24px', color:'var(--error)', fontFamily:FONT_MONO, fontSize:'12px', whiteSpace:'pre-wrap' }}>Diff failed: {diffError}</div>
+            : !diffData ? <div style={{ padding:'24px', color:'var(--muted)', fontSize:'12px' }}>Loading diff…</div>
+            : <DiffView diff={diffData} sideBySide={diffSideBySide} />
+          ) : showEditPane ? (
             <div style={{ display:'flex', flex:1, overflow:'hidden', minHeight:0 }}>
               <pre ref={lineNumbersRef} style={{
                 margin: 0,
@@ -755,8 +1031,10 @@ const PROJECTS_KEY = 'vibe-projects'
 const loadProjects = () => { try { return JSON.parse(localStorage.getItem(PROJECTS_KEY)) || [] } catch { return [] } }
 const saveProjects = (list) => localStorage.setItem(PROJECTS_KEY, JSON.stringify(list))
 const addProject = (path) => {
+  const list = loadProjects()
+  // Already known → preserve index so Cmd+N stays stable.
+  if (list.some(p => p.path === path)) return list
   const name = path.split('/').pop()
-  const list = loadProjects().filter(p => p.path !== path)
   list.unshift({ path, name })
   if (list.length > 10) list.length = 10
   saveProjects(list)
@@ -773,6 +1051,7 @@ function App() {
   const isEditingRef       = useRef(false)
   const editContentRef     = useRef('')
   const fileContentRef     = useRef('')
+  const rootPathRef        = useRef('')
   const requireCleanRef    = useRef(null)
   const handleEscapeKeyRef = useRef(null)
 
@@ -780,6 +1059,7 @@ function App() {
   const [selectedFile, setSelectedFile]         = useState(null)
   const [fileContent, setFileContent]           = useState('')
   const [isEditing, setIsEditing]               = useState(false)
+  const [diffMode, setDiffMode]                 = useState(false)
   const [editContent, setEditContent]           = useState('')
   const [pendingAction, setPendingAction]       = useState(null)
   const [activeFocus, setActiveFocus]           = useState('explorer')
@@ -793,6 +1073,8 @@ function App() {
   const [recentChanges, setRecentChanges]       = useState([])
   const [dashboardData, setDashboardData]       = useState(null)
   const [projects, setProjects]                 = useState(() => loadProjects())
+  const [gitInfo, setGitInfo]                   = useState({ isRepo: false, branch: null, filesByAbs: new Map(), dirtyCount: 0 })
+  const gitRefetchTimerRef                      = useRef(null)
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme === 'dark' ? 'dark' : '')
@@ -806,16 +1088,57 @@ function App() {
   isEditingRef.current        = isEditing
   editContentRef.current      = editContent
   fileContentRef.current      = fileContent
+  rootPathRef.current         = rootPath
 
   const isDirty = isEditing && editContent !== fileContent
 
   useEffect(() => {
     if (!selectedFile || selectedFile.isDirectory) { setFileContent(''); return }
-    setIsEditing(false); setEditContent('')
+    setIsEditing(false); setEditContent(''); setDiffMode(false)
     api.readFile(selectedFile.path)
       .then(d => setFileContent(d.content || ''))
       .catch(err => setFileContent(formatReadError(err)))
   }, [selectedFile])
+
+  const loadGitStatus = useCallback(async (rootAbs) => {
+    try {
+      const s = await api.gitStatus()
+      setGitInfo(prev => {
+        if (!s.isRepo) {
+          if (!prev.isRepo) return prev
+          return { isRepo: false, branch: null, filesByAbs: new Map(), dirtyCount: 0 }
+        }
+        const base = rootAbs || ''
+        const filesByAbs = new Map()
+        Object.entries(s.files || {}).forEach(([rel, state]) => {
+          filesByAbs.set(base + '/' + rel, state)
+        })
+        // Short-circuit when nothing materially changed — avoids cascading re-renders
+        // (dirtyDirs useMemo, Explorer tree, Dashboard badges) on every watcher tick.
+        if (
+          prev.isRepo &&
+          prev.branch === s.branch &&
+          prev.filesByAbs.size === filesByAbs.size
+        ) {
+          let same = true
+          for (const [k, v] of filesByAbs) {
+            if (prev.filesByAbs.get(k) !== v) { same = false; break }
+          }
+          if (same) return prev
+        }
+        return { isRepo: true, branch: s.branch, filesByAbs, dirtyCount: filesByAbs.size }
+      })
+    } catch (e) { console.error('git_status failed:', e) }
+  }, [])
+
+  const scheduleGitRefetch = useCallback((rootAbs) => {
+    if (gitRefetchTimerRef.current) clearTimeout(gitRefetchTimerRef.current)
+    gitRefetchTimerRef.current = setTimeout(() => loadGitStatus(rootAbs), 200)
+  }, [loadGitStatus])
+
+  useEffect(() => () => {
+    if (gitRefetchTimerRef.current) clearTimeout(gitRefetchTimerRef.current)
+  }, [])
 
   const loadDashboard = useCallback(async () => {
     try {
@@ -921,7 +1244,9 @@ function App() {
   const toggleViewerFullscreen = useCallback(() => setViewerFullscreen(p => !p), [])
   const handleFileSelect       = useCallback((file) => requireClean({ type:'changeFile', file }), [requireClean])
   const toggleSidebar          = useCallback(() => setSidebarVisible(p => !p), [])
-  const enterEditMode          = useCallback(() => { setEditContent(fileContentRef.current); setIsEditing(true) }, [])
+  const enterEditMode          = useCallback(() => { setDiffMode(false); setEditContent(fileContentRef.current); setIsEditing(true) }, [])
+  const enterDiffMode          = useCallback(() => setDiffMode(true), [])
+  const exitDiffMode           = useCallback(() => setDiffMode(false), [])
   const exitEditMode           = useCallback(() => requireClean({ type:'exitEdit' }), [requireClean])
   const closeViewer            = useCallback(() => requireClean({ type:'close' }), [requireClean])
   const focusExplorer          = useCallback(() => setActiveFocus('explorer'), [])
@@ -942,13 +1267,14 @@ function App() {
     setSelectedFile(null); setFileContent(''); setIsEditing(false); setEditContent('')
     setViewerFullscreen(false); setChangedFiles(new Set()); setRecentChanges([])
     setDashboardData(null)
+    setGitInfo({ isRepo: false, branch: null, filesByAbs: new Map(), dirtyCount: 0 })
     setRootPath(path)
     const list = addProject(path)
     setProjects(list)
     setRefreshKey(k => k + 1)
     setRootReady(true)
-    loadDashboard()
-  }, [loadDashboard])
+    // loadDashboard + loadGitStatus fire via the rootReady/rootPath effect below.
+  }, [])
 
   useEffect(() => {
     api.getRoot().then(r => {
@@ -956,14 +1282,17 @@ function App() {
       setRootReady(!!r); setRootPath(r || '')
     }).catch(() => setRootReady(false))
   }, [])
-  useEffect(() => { if (rootReady) loadDashboard() }, [rootReady, loadDashboard])
+  useEffect(() => { if (rootReady) { loadDashboard(); loadGitStatus(rootPath) } }, [rootReady, loadDashboard, loadGitStatus, rootPath])
 
   useEffect(() => {
     const ref = { current: null }; let unmounted = false
     api.onFileChanged((payload) => {
-      setRefreshKey(k => k + 1)
-      const paths = payload.paths || []
+      const allPaths = payload.paths || []
+      const gitEvent = allPaths.some(p => p.includes('/.git/'))
+      const paths = allPaths.filter(p => !p.includes('/.git/'))
+      if (gitEvent) scheduleGitRefetch(rootPathRef.current)
       if (paths.length > 0) {
+        setRefreshKey(k => k + 1)
         setChangedFiles(prev => { const n = new Set(prev); paths.forEach(p => n.add(p)); return n })
         const now = Date.now()
         const newEntries = paths.map(p => makeRecentEntry(p, now))
@@ -976,7 +1305,7 @@ function App() {
           if (Object.keys(counts).length > 0) setRecentChanges(prev => prev.map(e => counts[e.path + e.time] ? { ...e, lineCount: counts[e.path + e.time] } : e))
         })
       }
-      if (selectedFileRef.current && payload.paths?.includes(selectedFileRef.current.path)) {
+      if (selectedFileRef.current && paths.includes(selectedFileRef.current.path)) {
         if (!isEditingRef.current) api.readFile(selectedFileRef.current.path).then(d => setFileContent(d.content || '')).catch(err => setFileContent(formatReadError(err)))
       }
     }).then(fn => { if (unmounted) fn(); else ref.current = fn })
@@ -999,15 +1328,17 @@ function App() {
   }, [toggleSidebar, projects, rootPath, switchProject])
 
   const isMd = selectedFile?.name.split('.').pop() === 'md'
+  const gitDirty = !!(selectedFile && gitInfo.filesByAbs.has(selectedFile.path))
 
   const footerShortcuts = useMemo(() => {
     if (activeFocus === 'viewer') {
       if (isEditing) return isMd ? SHORTCUTS_VIEWER_EDIT_MD : SHORTCUTS_VIEWER_EDIT
+      if (diffMode) return SHORTCUTS_VIEWER_DIFF
       if (viewerFullscreen) return SHORTCUTS_VIEWER_FULLSCREEN
-      return SHORTCUTS_VIEWER_VIEW
+      return gitDirty ? SHORTCUTS_VIEWER_VIEW_DIRTY : SHORTCUTS_VIEWER_VIEW
     }
     return SHORTCUTS_EXPLORER
-  }, [activeFocus, isEditing, isMd, viewerFullscreen])
+  }, [activeFocus, isEditing, isMd, viewerFullscreen, diffMode, gitDirty])
 
   const handlePickFolder = async () => {
     const path = await api.pickFolder()
@@ -1058,17 +1389,17 @@ function App() {
 
       <div style={{ display:'flex', flex:1, overflow:'hidden' }}>
         <div style={{ width: sidebarVisible ? '240px' : '0px', opacity: sidebarVisible ? 1 : 0, visibility: sidebarVisible ? 'visible' : 'hidden', display:'flex', flexDirection:'column', flexShrink:0, borderRight: sidebarVisible ? '1px solid var(--border)' : 'none', background:'var(--bg)', overflow:'hidden', transition:'width 0.25s ease-in-out, opacity 0.2s ease-in-out' }}>
-          <FileExplorer key={rootPath} innerRef={explorerRef} onFocus={focusExplorer} onFileSelect={handleFileSelect} isFocused={activeFocus === 'explorer'} onAtRootChange={setExplorerAtRoot} refreshKey={refreshKey} activeFilePath={selectedFile?.path} changedFiles={changedFiles} />
+          <FileExplorer key={rootPath} innerRef={explorerRef} onFocus={focusExplorer} onFileSelect={handleFileSelect} isFocused={activeFocus === 'explorer'} onAtRootChange={setExplorerAtRoot} refreshKey={refreshKey} activeFilePath={selectedFile?.path} changedFiles={changedFiles} gitFiles={gitInfo.filesByAbs} gitInfo={gitInfo} />
         </div>
 
         <div style={{ display:'flex', flex:1, overflow:'hidden', background:'var(--surface)' }}>
           {selectedFile ? (
             <div style={{ flex: viewerFullscreen ? '0 0 100%' : 1, minWidth: viewerFullscreen ? '100%' : '40%', overflow:'hidden' }}>
-              <FileViewer innerRef={viewerRef} onFocus={focusViewer} onClose={closeViewer} onToggleFullscreen={toggleViewerFullscreen} onEnterEdit={enterEditMode} onExitEdit={exitEditMode} onSave={saveFile} onEditContentChange={setEditContent} selectedFile={selectedFile} content={fileContent} isEditing={isEditing} editContent={editContent} isDirty={isDirty} isMd={isMd} isDark={isDark} isFocused={activeFocus === 'viewer'} />
+              <FileViewer innerRef={viewerRef} onFocus={focusViewer} onClose={closeViewer} onToggleFullscreen={toggleViewerFullscreen} onEnterEdit={enterEditMode} onExitEdit={exitEditMode} onSave={saveFile} onEditContentChange={setEditContent} selectedFile={selectedFile} content={fileContent} isEditing={isEditing} editContent={editContent} isDirty={isDirty} isMd={isMd} isDark={isDark} isFocused={activeFocus === 'viewer'} gitDirty={gitDirty} diffMode={diffMode} onEnterDiff={enterDiffMode} onExitDiff={exitDiffMode} />
             </div>
           ) : (
             <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-              <ProjectDashboard data={dashboardData} recentChanges={recentChanges} onFileOpen={handleFileSelect} onRefresh={loadDashboard} />
+              <ProjectDashboard data={dashboardData} recentChanges={recentChanges} onFileOpen={handleFileSelect} onRefresh={() => Promise.all([loadDashboard(), loadGitStatus(rootPath)])} gitInfo={gitInfo} />
             </div>
           )}
         </div>

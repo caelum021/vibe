@@ -28,5 +28,11 @@ export const getRoot = () =>
 export const pickFolder = () =>
   invoke('pick_folder')
 
+export const gitStatus = () =>
+  invoke('git_status')
+
+export const gitDiff = (path) =>
+  invoke('git_diff', { path })
+
 export const onFileChanged = (callback) =>
   listen('file-changed', (event) => callback(event.payload))

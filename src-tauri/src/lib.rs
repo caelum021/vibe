@@ -4,7 +4,7 @@ mod error;
 mod state;
 pub mod watcher;
 
-use commands::{dialog, file_ops, watcher_cmd};
+use commands::{dialog, file_ops, git, watcher_cmd};
 use state::AppState;
 use tauri::Manager;
 use tauri_plugin_cli::CliExt;
@@ -43,6 +43,8 @@ pub fn run() {
             watcher_cmd::set_root,
             watcher_cmd::get_root,
             dialog::pick_folder,
+            git::git_status,
+            git::git_diff,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

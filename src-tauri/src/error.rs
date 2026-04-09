@@ -16,6 +16,8 @@ pub enum AppError {
     RootNotAllowed,
     #[error("Watcher error: {0}")]
     Watcher(#[from] notify::Error),
+    #[error("Git error: {0}")]
+    Git(#[from] git2::Error),
 }
 
 impl Serialize for AppError {

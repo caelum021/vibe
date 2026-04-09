@@ -42,6 +42,18 @@
       @keyframes spin {
         to { transform: rotate(360deg); }
       }
+      /* Explorer header: reveal actions only on hover */
+      .explorer-header .explorer-actions {
+        opacity: 0;
+        transform: translateX(4px);
+        transition: opacity 180ms ease-out, transform 180ms ease-out;
+        pointer-events: none;
+      }
+      .explorer-header:hover .explorer-actions {
+        opacity: 1;
+        transform: translateX(0);
+        pointer-events: auto;
+      }
       *, *::before, *::after { box-sizing: border-box; }
       body, html, #root {
         margin: 0; padding: 0;

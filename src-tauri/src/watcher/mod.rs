@@ -52,10 +52,23 @@ fn build_payload(events: Vec<Event>) -> FileChangedPayload {
 }
 
 fn is_ignored(path: &std::path::Path) -> bool {
-    path.components().any(|c| {
-        let s = c.as_os_str().to_string_lossy();
-        IGNORED.contains(&s.as_ref())
-    })
+    let mut iter = path.components().peekable();
+    while let Some(comp) = iter.next() {
+        let name = comp.as_os_str().to_string_lossy();
+        if name == ".git" {
+            // Allow only the files that indicate git state changes.
+            let rest: Vec<String> = iter.map(|c| c.as_os_str().to_string_lossy().into_owned()).collect();
+            let joined = rest.join("/");
+            if joined == "HEAD" || joined == "index" || joined.starts_with("refs/heads/") {
+                return false;
+            }
+            return true;
+        }
+        if IGNORED.contains(&name.as_ref()) {
+            return true;
+        }
+    }
+    false
 }
 
 fn classify_kind(kind: &notify::EventKind) -> String {
