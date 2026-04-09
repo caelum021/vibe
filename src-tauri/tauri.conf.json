@@ -5,7 +5,7 @@
   "identifier": "com.vibe.app",
   "build": {
     "frontendDist": "../client/dist",
-    "devUrl": "http://localhost:3000",
+    "devUrl": "http://localhost:5188",
     "beforeDevCommand": "cd ../client && npm run dev",
     "beforeBuildCommand": "cd ../client && npm run build"
   },

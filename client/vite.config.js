@@ -7,7 +7,7 @@ export default defineConfig({
   clearScreen: false,
   envPrefix: ['VITE_', 'TAURI_'],
   server: {
-    port: 3000,
+    port: 5188,
     strictPort: true,
   }
 })
