@@ -146,16 +146,40 @@ function StatCard({ value, label }) {
 const SECTION_LABEL = { fontSize:'10px', fontWeight:500, textTransform:'uppercase', letterSpacing:'0.1em', color:'var(--muted)', marginBottom:'8px' }
 const DIVIDER       = { border:'none', borderTop:'1px solid var(--border)', margin:0 }
 
-function ProjectDashboard({ data, recentChanges, onFileOpen }) {
+const RECENT_CHANGES_LIMIT = 5
+const isHiddenFile   = (f) => f.name.startsWith('.') || f.parentDir?.startsWith('.')
+const basenameOf     = (p) => p.split('/').pop()
+const makeRecentEntry = (path, time) => ({ path, name: basenameOf(path), time, lineCount: 0 })
+
+function ProjectDashboard({ data, recentChanges, onFileOpen, onRefresh }) {
+  const [refreshing, setRefreshing] = useState(false)
+  const handleRefresh = async () => {
+    setRefreshing(true)
+    try { await onRefresh() } finally { setRefreshing(false) }
+  }
   if (!data) return <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100%', color:'var(--muted)', fontSize:'13px' }}>Loading…</div>
   const { projectName, projectPath, totalFiles, totalFolders, langStats, docGroups } = data
   const totalDocs = docGroups.reduce((sum, g) => sum + g.items.length, 0)
 
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', overflowY:'auto', padding:'32px 48px', gap:'32px' }}>
-      <div>
-        <div style={{ fontFamily:FONT_SERIF, fontStyle:'italic', fontSize:'26px', fontWeight:400, color:'var(--text)', lineHeight:1.2 }}>{projectName}</div>
-        <div style={{ fontFamily:FONT_MONO, fontSize:'11px', color:'var(--muted)', marginTop:'4px' }}>{projectPath}</div>
+      <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:'16px' }}>
+        <div style={{ minWidth:0 }}>
+          <div style={{ fontFamily:FONT_SERIF, fontStyle:'italic', fontSize:'26px', fontWeight:400, color:'var(--text)', lineHeight:1.2 }}>{projectName}</div>
+          <div style={{ fontFamily:FONT_MONO, fontSize:'11px', color:'var(--muted)', marginTop:'4px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{projectPath}</div>
+        </div>
+        <button
+          onClick={handleRefresh}
+          disabled={refreshing}
+          title="Refresh"
+          onMouseEnter={e => { if (!refreshing) e.currentTarget.style.background = 'var(--surface-2)' }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+          style={{ background:'transparent', border:'1px solid var(--border)', color:'var(--muted)', cursor: refreshing ? 'default' : 'pointer', padding:'6px', borderRadius:'5px', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, transition:'background 150ms ease-out' }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: refreshing ? 'spin 800ms linear infinite' : 'none' }}>
+            <path d="M21 12a9 9 0 1 1-3-6.7L21 8"/>
+            <path d="M21 3v5h-5"/>
+          </svg>
+        </button>
       </div>
 
       <hr style={DIVIDER} />
@@ -795,7 +819,8 @@ function App() {
 
   const loadDashboard = useCallback(async () => {
     try {
-      const rootData = await api.listFiles('')
+      const listWithMtime = (path) => api.listFiles(path, { includeMtime: true })
+      const rootData = await listWithMtime('')
       const rootItems = rootData.items || []
       const allFiles = []
       let totalFolders = 0
@@ -803,7 +828,7 @@ function App() {
       const subDirScans = []
       await Promise.all(rootItems.filter(f => f.isDirectory).map(async (dir) => {
         try {
-          const sub = await api.listFiles(dir.path)
+          const sub = await listWithMtime(dir.path)
           ;(sub.items || []).forEach(item => {
             if (!item.isDirectory) allFiles.push({ ...item, parentDir: dir.name })
             else { totalFolders++; if (DOC_FOLDERS.has(dir.name.toLowerCase())) subDirScans.push({ dirPath: item.path, parentDir: dir.name + '/' + item.name }) }
@@ -812,11 +837,11 @@ function App() {
       }))
       // Scan one more level inside doc folders (e.g. docs/subfolder/*.md)
       await Promise.all(subDirScans.map(async ({ dirPath, parentDir }) => {
-        try { const sub = await api.listFiles(dirPath); (sub.items || []).forEach(item => { if (!item.isDirectory) allFiles.push({ ...item, parentDir }) }) } catch (_) {}
+        try { const sub = await listWithMtime(dirPath); (sub.items || []).forEach(item => { if (!item.isDirectory) allFiles.push({ ...item, parentDir }) }) } catch (_) {}
       }))
       const extCounts = {}, docs = []
       allFiles.forEach(file => {
-        if (file.name.startsWith('.') || file.parentDir?.startsWith('.')) return
+        if (isHiddenFile(file)) return
         const ext = file.name.split('.').pop()?.toLowerCase() || ''
         extCounts[ext] = (extCounts[ext] || 0) + 1
         if (DOC_EXTENSIONS.has(ext)) docs.push(file)
@@ -854,6 +879,12 @@ function App() {
       Object.entries(extCounts).forEach(([ext, count]) => { const lang = EXT_TO_LANG[ext]; if (lang) langCounts[lang] = (langCounts[lang] || 0) + count })
       const totalLang = Object.values(langCounts).reduce((a, b) => a + b, 0) || 1
       const langStats = Object.entries(langCounts).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([name, count]) => ({ name, pct: Math.round(count / totalLang * 100), color: LANG_COLORS[name] || LANG_COLORS.Other }))
+      const recentFiles = allFiles
+        .filter(f => f.modifiedMs && !isHiddenFile(f))
+        .sort((a, b) => b.modifiedMs - a.modifiedMs)
+        .slice(0, RECENT_CHANGES_LIMIT)
+        .map(f => makeRecentEntry(f.path, f.modifiedMs))
+      setRecentChanges(recentFiles)
       setDashboardData({ projectName: rootData.currentPath?.split('/').pop() || 'project', projectPath: rootData.currentPath || '', totalFiles: allFiles.length, totalFolders, langStats, docGroups })
     } catch (e) { console.error('Dashboard load failed:', e) }
   }, [])
@@ -935,8 +966,8 @@ function App() {
       if (paths.length > 0) {
         setChangedFiles(prev => { const n = new Set(prev); paths.forEach(p => n.add(p)); return n })
         const now = Date.now()
-        const newEntries = paths.map(p => ({ path:p, name:p.split('/').pop(), time:now, lineCount:0 }))
-        setRecentChanges(prev => [...newEntries, ...prev.filter(e => !paths.includes(e.path))].slice(0, 5))
+        const newEntries = paths.map(p => makeRecentEntry(p, now))
+        setRecentChanges(prev => [...newEntries, ...prev.filter(e => !paths.includes(e.path))].slice(0, RECENT_CHANGES_LIMIT))
         // Fetch line counts async (batched update)
         Promise.all(newEntries.map(entry =>
           api.readFile(entry.path).then(d => ({ path: entry.path, time: entry.time, lineCount: (d.content || '').split('\n').length })).catch(() => null)
@@ -1037,7 +1068,7 @@ function App() {
             </div>
           ) : (
             <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-              <ProjectDashboard data={dashboardData} recentChanges={recentChanges} onFileOpen={handleFileSelect} />
+              <ProjectDashboard data={dashboardData} recentChanges={recentChanges} onFileOpen={handleFileSelect} onRefresh={loadDashboard} />
             </div>
           )}
         </div>

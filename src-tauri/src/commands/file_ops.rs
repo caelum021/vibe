@@ -52,6 +52,7 @@ pub struct FileEntry {
     pub name: String,
     pub path: String,
     pub is_directory: bool,
+    pub modified_ms: Option<u64>,
 }
 
 #[derive(Serialize)]
@@ -62,12 +63,17 @@ pub struct DirListing {
 }
 
 #[tauri::command]
-pub fn list_files(path: Option<String>, state: State<AppState>) -> Result<DirListing, AppError> {
+pub fn list_files(
+    path: Option<String>,
+    include_mtime: Option<bool>,
+    state: State<AppState>,
+) -> Result<DirListing, AppError> {
     let root = state.get_root()?;
     let target = match &path {
         Some(p) if !p.is_empty() => validate_path(&root, p, true)?,
         _ => root.canonicalize().map_err(|_| AppError::AccessDenied)?,
     };
+    let want_mtime = include_mtime.unwrap_or(false);
 
     let mut entries: Vec<FileEntry> = std::fs::read_dir(&target)?
         .filter_map(|e| e.ok())
@@ -78,10 +84,20 @@ pub fn list_files(path: Option<String>, state: State<AppState>) -> Result<DirLis
         })
         .map(|e| {
             let is_dir = e.file_type().map(|t| t.is_dir()).unwrap_or(false);
+            // stat syscall only when dashboard asks for mtime — Explorer nav stays cheap
+            let modified_ms = if want_mtime {
+                e.metadata().ok()
+                    .and_then(|m| m.modified().ok())
+                    .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                    .map(|d| d.as_millis() as u64)
+            } else {
+                None
+            };
             FileEntry {
                 name: e.file_name().to_string_lossy().into_owned(),
                 path: e.path().to_string_lossy().into_owned(),
                 is_directory: is_dir,
+                modified_ms,
             }
         })
         .collect();

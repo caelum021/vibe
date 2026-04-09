@@ -1,8 +1,8 @@
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 
-export const listFiles = (path = '') =>
-  invoke('list_files', { path: path || null })
+export const listFiles = (path = '', { includeMtime = false } = {}) =>
+  invoke('list_files', { path: path || null, includeMtime })
 
 export const readFile = (path) =>
   invoke('read_file', { path })
