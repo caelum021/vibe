@@ -1,6 +1,6 @@
 # vibe
 
-A lightweight, always-on window to see what AI builds.
+A lightweight, always-on window to track what AI builds.
 
 **vibe .** That's all you need.
 
