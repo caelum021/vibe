@@ -125,10 +125,6 @@ vibe/
 │   │   ├── App.jsx      # Main UI component
 │   │   └── api.js       # Tauri IPC layer
 │   └── package.json
-├── docs/
-│   ├── reference/design.md     # Design system spec
-│   ├── architecture/           # Design docs for implemented features
-│   └── plan/                   # In-progress plans
 └── README.md
 ```
 
