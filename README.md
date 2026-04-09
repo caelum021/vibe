@@ -66,7 +66,7 @@ vibe
 
 ## Design
 
-Warm, minimal aesthetic. Aged-paper light theme, warm-walnut dark theme. Rust/ember accent for active states. Typography: Instrument Serif (directories), Geist (UI), JetBrains Mono (code). See [DESIGN.md](./DESIGN.md) for full spec.
+Warm, minimal aesthetic. Aged-paper light theme, warm-walnut dark theme. Rust/ember accent for active states. Typography: Instrument Serif (directories), Geist (UI), JetBrains Mono (code). See [docs/reference/design.md](./docs/reference/design.md) for full spec.
 
 ## Keyboard Shortcuts
 
@@ -116,7 +116,10 @@ vibe/
 │   │   ├── App.jsx      # Main UI component
 │   │   └── api.js       # Tauri IPC layer
 │   └── package.json
-├── DESIGN.md            # Design system spec
+├── docs/
+│   ├── reference/design.md     # Design system spec
+│   ├── architecture/           # Design docs for implemented features
+│   └── plan/                   # In-progress plans
 └── README.md
 ```
 

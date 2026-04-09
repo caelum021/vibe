@@ -54,7 +54,7 @@ vibe
 
 ## 디자인
 
-따뜻하고 미니멀한 미학. 오래된 종이 느낌의 라이트 테마, 따뜻한 월넛 톤의 다크 테마. 활성 상태에 러스트/엠버 액센트. 타이포그래피: Instrument Serif (디렉토리), Geist (UI), JetBrains Mono (코드). 전체 스펙은 [DESIGN.md](./DESIGN.md) 참고.
+따뜻하고 미니멀한 미학. 오래된 종이 느낌의 라이트 테마, 따뜻한 월넛 톤의 다크 테마. 활성 상태에 러스트/엠버 액센트. 타이포그래피: Instrument Serif (디렉토리), Geist (UI), JetBrains Mono (코드). 전체 스펙은 [docs/reference/design.md](./docs/reference/design.md) 참고.
 
 ## 단축키
 
