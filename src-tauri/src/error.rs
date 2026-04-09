@@ -18,6 +18,8 @@ pub enum AppError {
     Watcher(#[from] notify::Error),
     #[error("Git error: {0}")]
     Git(#[from] git2::Error),
+    #[error("Internal lock error")]
+    LockPoisoned,
 }
 
 impl Serialize for AppError {

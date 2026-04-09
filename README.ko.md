@@ -2,6 +2,13 @@
 
 **vibe**는 Tauri v2 기반의 초경량 네이티브 데스크톱 앱입니다. AI CLI(Claude Code 등)가 만든 결과물을 항상 떠 있는 창에서 바로 확인할 수 있습니다.
 
+<p align="center">
+  <img src="./assets/screenshot-light.png" width="720" alt="Vibe — 라이트 모드" />
+</p>
+<p align="center">
+  <img src="./assets/screenshot-dark.png" width="720" alt="Vibe — 다크 모드" />
+</p>
+
 ## 시작하기
 
 ### 필수 조건
@@ -47,6 +54,7 @@ vibe
 | **파일 뷰어** | 마크다운 렌더링, 코드 구문 강조, 줄 번호 |
 | **파일 편집** | 즉석 편집 모드, Ctrl+S 저장 |
 | **파일 감시** | AI가 파일 수정 시 자동 새로고침, 변경 뱃지 펄스 애니메이션 |
+| **Git 연동** | 파일별 상태 뱃지 (수정/추가/삭제), 변경된 파일의 인라인 diff 뷰 |
 | **파일 관리** | 파일/폴더 생성, 이름 변경, 삭제 |
 | **프로젝트 대시보드** | 언어 분포 바, 문서 그룹핑, 최근 변경 파일 |
 | **멀티 프로젝트** | 여러 프로젝트 등록, Cmd+1-9 또는 하단 드롭다운으로 전환 |
@@ -54,7 +62,7 @@ vibe
 
 ## 디자인
 
-따뜻하고 미니멀한 미학. 오래된 종이 느낌의 라이트 테마, 따뜻한 월넛 톤의 다크 테마. 활성 상태에 러스트/엠버 액센트. 타이포그래피: Instrument Serif (디렉토리), Geist (UI), JetBrains Mono (코드). 전체 스펙은 [docs/reference/design.md](./docs/reference/design.md) 참고.
+따뜻하고 미니멀한 미학. 오래된 종이 느낌의 라이트 테마, 따뜻한 월넛 톤의 다크 테마. 활성 상태에 러스트/엠버 액센트. 타이포그래피: Instrument Serif (디렉토리), Geist (UI), JetBrains Mono (코드).
 
 ## 단축키
 
@@ -84,6 +92,7 @@ vibe
 | 마크다운 | react-markdown + remark-gfm |
 | 코드 하이라이트 | react-syntax-highlighter (Prism) |
 | 파일 감시 | notify crate (OS 네이티브) |
+| Git | git2 (libgit2) |
 
 ## 라이선스
 

@@ -6,6 +6,13 @@ A lightweight, always-on window to see what AI builds.
 
 [한국어 설명 (Korean README)](./README.ko.md)
 
+<p align="center">
+  <img src="./assets/screenshot-light.png" width="720" alt="Vibe — light mode" />
+</p>
+<p align="center">
+  <img src="./assets/screenshot-dark.png" width="720" alt="Vibe — dark mode" />
+</p>
+
 ## What is Vibe?
 
 When coding with AI CLIs (Claude Code, etc.), you need `cat`, `vim`, or a heavy IDE just to check the output. Vibe solves this.
@@ -59,6 +66,7 @@ vibe
 | **File Viewer** | Markdown rendering, syntax highlighting, line numbers |
 | **File Editing** | Inline edit mode, Ctrl+S to save |
 | **File Watching** | Auto-refresh on file changes (150ms debounce), change badges with pulse animation |
+| **Git Integration** | Per-file status badges (modified/added/deleted), inline diff view for changed files |
 | **File Operations** | Create, rename, delete files and folders |
 | **Project Dashboard** | Language distribution bar, document grouping, recently changed files |
 | **Multi-Project** | Register multiple projects, switch with Cmd+1-9 or footer dropdown |
@@ -66,7 +74,7 @@ vibe
 
 ## Design
 
-Warm, minimal aesthetic. Aged-paper light theme, warm-walnut dark theme. Rust/ember accent for active states. Typography: Instrument Serif (directories), Geist (UI), JetBrains Mono (code). See [docs/reference/design.md](./docs/reference/design.md) for full spec.
+Warm, minimal aesthetic. Aged-paper light theme, warm-walnut dark theme. Rust/ember accent for active states. Typography: Instrument Serif (directories), Geist (UI), JetBrains Mono (code).
 
 ## Keyboard Shortcuts
 
@@ -96,6 +104,7 @@ Warm, minimal aesthetic. Aged-paper light theme, warm-walnut dark theme. Rust/em
 | Markdown | react-markdown + remark-gfm |
 | Code Highlight | react-syntax-highlighter (Prism) |
 | File Watching | notify crate (OS-native) |
+| Git | git2 (libgit2) |
 
 ## Project Structure
 
@@ -103,7 +112,7 @@ Warm, minimal aesthetic. Aged-paper light theme, warm-walnut dark theme. Rust/em
 vibe/
 ├── src-tauri/           # Rust backend
 │   ├── src/
-│   │   ├── commands/    # Tauri commands (file ops, watcher, dialog)
+│   │   ├── commands/    # Tauri commands (file ops, watcher, dialog, git)
 │   │   ├── watcher/     # File system watcher with debounce
 │   │   ├── constants.rs # Shared constants
 │   │   ├── error.rs     # Error types

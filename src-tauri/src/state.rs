@@ -20,7 +20,7 @@ impl AppState {
     pub fn get_root(&self) -> Result<PathBuf, AppError> {
         self.root
             .lock()
-            .unwrap()
+            .map_err(|_| AppError::LockPoisoned)?
             .clone()
             .ok_or(AppError::NoRootSet)
     }

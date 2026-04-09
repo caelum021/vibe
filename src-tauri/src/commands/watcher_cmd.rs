@@ -19,11 +19,11 @@ pub fn set_root_internal(
     let canonical = root.canonicalize()?;
 
     // Hold watcher lock for the full transition to avoid inconsistent state
-    let mut w = state.watcher.lock().unwrap();
+    let mut w = state.watcher.lock().map_err(|_| AppError::LockPoisoned)?;
     *w = None; // stop existing watcher
 
     {
-        let mut r = state.root.lock().unwrap();
+        let mut r = state.root.lock().map_err(|_| AppError::LockPoisoned)?;
         *r = Some(canonical.clone());
     }
 

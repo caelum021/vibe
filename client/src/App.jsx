@@ -191,8 +191,8 @@ function DiffRowInline({ index, style, rows }) {
   }
   const l = row.line
   let bg = 'transparent', mark = ' ', color = 'var(--text)'
-  if (l.kind === 'add') { bg = 'color-mix(in srgb, #3A7D52 12%, transparent)'; mark = '+'; color = '#3A7D52' }
-  else if (l.kind === 'del') { bg = 'color-mix(in srgb, #9B3030 12%, transparent)'; mark = '−'; color = '#9B3030' }
+  if (l.kind === 'add') { bg = 'color-mix(in srgb, var(--success) 12%, transparent)'; mark = '+'; color = 'var(--success)' }
+  else if (l.kind === 'del') { bg = 'color-mix(in srgb, var(--error) 12%, transparent)'; mark = '−'; color = 'var(--error)' }
   return (
     <div style={{ ...style, ...DIFF_ROW_STYLE, background: bg }}>
       <span style={DIFF_GUTTER}>{l.oldNum ?? ''}</span>
@@ -215,8 +215,8 @@ function DiffRowSplit({ index, style, rows }) {
   const { left, right } = row
   const cell = (side) => {
     if (!side) return { bg: 'var(--surface-2)', num: '', content: '' }
-    if (side.kind === 'add') return { bg: 'color-mix(in srgb, #3A7D52 12%, transparent)', num: side.newNum ?? '', content: side.content }
-    if (side.kind === 'del') return { bg: 'color-mix(in srgb, #9B3030 12%, transparent)', num: side.oldNum ?? '', content: side.content }
+    if (side.kind === 'add') return { bg: 'color-mix(in srgb, var(--success) 12%, transparent)', num: side.newNum ?? '', content: side.content }
+    if (side.kind === 'del') return { bg: 'color-mix(in srgb, var(--error) 12%, transparent)', num: side.oldNum ?? '', content: side.content }
     return { bg: 'transparent', num: (side.oldNum ?? side.newNum) ?? '', content: side.content }
   }
   const L = cell(left), R = cell(right)
