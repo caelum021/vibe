@@ -1,6 +1,6 @@
 # vibe
 
-A lightweight, always-on window to track what AI builds.
+Your window into AI-native coding.
 
 **vibe .** That's all you need.
 
@@ -15,11 +15,11 @@ A lightweight, always-on window to track what AI builds.
 
 ## What is Vibe?
 
-When coding with AI CLIs (Claude Code, etc.), you need `cat`, `vim`, or a heavy IDE just to check the output. Vibe solves this.
+When you code with AI, the real collaboration happens through documents. Existing IDEs are bloated with debugging and compilation tools you no longer need. Vibe strips all that away — just documents, edits, and context.
 
-- **Always on** — Auto-refreshes when AI changes files. Zero context-switching cost.
-- **Viewing is the point** — Markdown rendering, syntax highlighting, one click to check.
-- **Light and fast** — Tauri native app. ~2MB DMG. Instant launch.
+- **Documents are the interface** — Write specs, review AI output, edit files to steer direction. That's the workflow.
+- **Always on** — Auto-refreshes when AI changes files. Monitor scope and content in real time.
+- **Light and fast** — Tauri native app. ~2MB DMG. No debugger, no compiler, no bloat.
 
 ## Installation
 

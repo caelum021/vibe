@@ -1,11 +1,22 @@
 use crate::constants::IGNORED;
 use crate::error::AppError;
 use crate::state::AppState;
+use base64::Engine;
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 use tauri::State;
 
 const MAX_FILE_SIZE: u64 = 1024 * 1024;
+const MAX_IMAGE_SIZE: u64 = 10 * 1024 * 1024;
+const MAX_WALK_DEPTH: u32 = 20;
+
+fn is_tmp_file(name: &str) -> bool {
+    name.contains(".tmp.")
+}
+
+fn is_skipped_name(name: &str) -> bool {
+    IGNORED.contains(&name) || name.starts_with('.') || is_tmp_file(name)
+}
 
 fn validate_path(root: &Path, raw: &str, allow_root: bool) -> Result<PathBuf, AppError> {
     let resolved = if raw.is_empty() {
@@ -80,7 +91,7 @@ pub fn list_files(
         .filter(|e| {
             let name = e.file_name();
             let name_str = name.to_string_lossy();
-            !IGNORED.contains(&name_str.as_ref())
+            !IGNORED.contains(&name_str.as_ref()) && !is_tmp_file(&name_str)
         })
         .map(|e| {
             let is_dir = e.file_type().map(|t| t.is_dir()).unwrap_or(false);
@@ -183,4 +194,110 @@ pub fn rename_item(
     let validated_new = validate_new_path(&root, &new_path)?;
     std::fs::rename(validated_old, validated_new)?;
     Ok(())
+}
+
+// ── Recursive file listing for dashboard ─────────────────────────────────────
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AllFilesListing {
+    pub root_path: String,
+    pub files: Vec<FileEntry>,
+    pub total_folders: u32,
+}
+
+fn walk_dir(
+    dir: &Path,
+    files: &mut Vec<FileEntry>,
+    folder_count: &mut u32,
+    depth: u32,
+) {
+    if depth >= MAX_WALK_DEPTH {
+        return;
+    }
+    let entries = match std::fs::read_dir(dir) {
+        Ok(rd) => rd,
+        Err(_) => return,
+    };
+    for entry in entries.filter_map(|e| e.ok()) {
+        let name = entry.file_name();
+        let name_str = name.to_string_lossy();
+        if is_skipped_name(&name_str) {
+            continue;
+        }
+        let is_dir = entry.file_type().map(|t| t.is_dir()).unwrap_or(false);
+        if is_dir {
+            *folder_count += 1;
+            walk_dir(&entry.path(), files, folder_count, depth + 1);
+        } else {
+            let modified_ms = entry
+                .metadata()
+                .ok()
+                .and_then(|m| m.modified().ok())
+                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                .map(|d| d.as_millis() as u64);
+            files.push(FileEntry {
+                name: name_str.into_owned(),
+                path: entry.path().to_string_lossy().into_owned(),
+                is_directory: false,
+                modified_ms,
+            });
+        }
+    }
+}
+
+#[tauri::command]
+pub fn list_all_files(state: State<AppState>) -> Result<AllFilesListing, AppError> {
+    let root = state.get_root()?;
+    let canonical_root = root.canonicalize().map_err(|_| AppError::AccessDenied)?;
+    let mut files = Vec::new();
+    let mut total_folders: u32 = 0;
+    walk_dir(&canonical_root, &mut files, &mut total_folders, 0);
+    Ok(AllFilesListing {
+        root_path: canonical_root.to_string_lossy().into_owned(),
+        files,
+        total_folders,
+    })
+}
+
+// ── Image reading (base64) ──────────────────────────────────────────────────
+
+fn mime_from_ext(ext: &str) -> &'static str {
+    match ext {
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "gif" => "image/gif",
+        "svg" => "image/svg+xml",
+        "webp" => "image/webp",
+        "ico" => "image/x-icon",
+        "bmp" => "image/bmp",
+        _ => "application/octet-stream",
+    }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImageData {
+    pub data_url: String,
+}
+
+#[tauri::command]
+pub fn read_image(path: String, state: State<AppState>) -> Result<ImageData, AppError> {
+    let root = state.get_root()?;
+    let validated = validate_path(&root, &path, true)?;
+    let meta = std::fs::metadata(&validated)?;
+    if meta.len() > MAX_IMAGE_SIZE {
+        return Err(AppError::FileTooLarge);
+    }
+    let ext = validated
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    let mime = mime_from_ext(&ext);
+    let bytes = std::fs::read(&validated)?;
+    let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
+    Ok(ImageData {
+        data_url: format!("data:{};base64,{}", mime, b64),
+    })
 }

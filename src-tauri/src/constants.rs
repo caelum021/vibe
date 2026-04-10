@@ -1,9 +1,16 @@
 pub const IGNORED: &[&str] = &[
     ".git",
     "node_modules",
+    "target",
     ".next",
     "dist",
     ".gemini",
     "vibe-python",
     ".claude",
+    "__pycache__",
+    "venv",
+    "build",
+    "bin",
+    "obj",
+    "vendor",
 ];

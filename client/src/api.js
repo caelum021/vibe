@@ -4,8 +4,14 @@ import { listen } from '@tauri-apps/api/event'
 export const listFiles = (path = '', { includeMtime = false } = {}) =>
   invoke('list_files', { path: path || null, includeMtime })
 
+export const listAllFiles = () =>
+  invoke('list_all_files')
+
 export const readFile = (path) =>
   invoke('read_file', { path })
+
+export const readImage = (path) =>
+  invoke('read_image', { path })
 
 export const writeFile = (path, content) =>
   invoke('write_file', { path, content })

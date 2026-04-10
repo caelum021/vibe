@@ -1,6 +1,6 @@
-# vibe — 가벼운 AI 코드 뷰어
+# vibe — AI와 코딩할 때, 문서로 소통하는 도구
 
-**vibe**는 Tauri v2 기반의 초경량 네이티브 데스크톱 앱입니다. AI CLI(Claude Code 등)가 만든 결과물을 항상 떠 있는 창에서 바로 확인할 수 있습니다.
+AI와 코딩할 때 실제 협업은 문서를 통해 이루어집니다. 기존 IDE는 디버깅·컴파일 기능이 무겁지만, AI 협업에는 그게 필요 없습니다. **vibe**는 문서 작성·편집·변경 맥락 파악에 집중하는 초경량 Tauri v2 데스크톱 앱입니다. AI CLI(Claude Code 등)의 변경을 실시간으로 모니터하고, 수정 범위와 내용을 확인하며, 파일을 직접 수정해서 바로바로 피드백할 수 있습니다.
 
 <p align="center">
   <img src="./assets/screenshot-light.png" width="720" alt="Vibe — 라이트 모드" />

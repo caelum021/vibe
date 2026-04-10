@@ -35,11 +35,13 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             file_ops::list_files,
+            file_ops::list_all_files,
             file_ops::read_file,
             file_ops::write_file,
             file_ops::create_item,
             file_ops::delete_item,
             file_ops::rename_item,
+            file_ops::read_image,
             watcher_cmd::set_root,
             watcher_cmd::get_root,
             dialog::pick_folder,
