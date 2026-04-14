@@ -38,9 +38,9 @@ function makeMarkdownComponents(isDark, fileDirPath) {
         : <code style={{ background:'var(--surface-2)', padding:'1px 5px', borderRadius:'3px', color:'var(--accent)', fontSize:'11.5px', fontFamily:FONT_MONO, letterSpacing:'0.01em' }}>{children}</code>
     },
     a: ({href, children}) => <a href={href} style={{ color:'var(--accent)', textDecoration:'underline', textUnderlineOffset:'2px' }} target="_blank" rel="noreferrer">{children}</a>,
-    ul: ({children}) => <ul style={{ paddingLeft:'20px', marginBottom:'10px', marginTop:'4px' }}>{children}</ul>,
-    ol: ({children}) => <ol style={{ paddingLeft:'20px', marginBottom:'10px', marginTop:'4px' }}>{children}</ol>,
-    li: ({children}) => <li style={{ marginBottom:'4px', color:'var(--text)', lineHeight:'1.65' }}>{children}</li>,
+    ul: ({children}) => <ul style={{ paddingLeft:'20px', marginBottom:'12px', marginTop:'6px' }}>{children}</ul>,
+    ol: ({children}) => <ol style={{ paddingLeft:'20px', marginBottom:'12px', marginTop:'6px' }}>{children}</ol>,
+    li: ({children}) => <li style={{ marginBottom:'6px', color:'var(--text)', lineHeight:'1.7' }}>{children}</li>,
     blockquote: ({children}) => <blockquote style={{ borderLeft:'3px solid var(--accent)', paddingLeft:'16px', margin:'0 0 8px 0', color:'var(--muted)' }}>{children}</blockquote>,
     hr: () => <hr style={{ border:'none', borderTop:'1px solid var(--border)', margin:'24px 0' }} />,
     strong: ({children}) => <strong style={{ fontWeight:600 }}>{children}</strong>,

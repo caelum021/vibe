@@ -7,6 +7,7 @@
     "dialog:default",
     "dialog:allow-open",
     "cli:default",
-    "cli:allow-cli-matches"
+    "cli:allow-cli-matches",
+    "core:window:allow-set-title"
   ]
 }

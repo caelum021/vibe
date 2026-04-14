@@ -25,11 +25,8 @@ const FileViewer = ({
   const ext = selectedFile?.name.split('.').pop()?.toLowerCase() ?? ''
   const langBadge = EXT_TO_DISPLAY[ext] || ext || '—'
 
-  // textarea padding-top offsets the line-number gutter so line "1" aligns with the first text line.
   const handleTextareaScroll = useCallback((e) => {
-    if (lineNumbersRef.current) {
-      lineNumbersRef.current.style.transform = `translateY(${EDIT_PADDING_PX - e.currentTarget.scrollTop}px)`
-    }
+    if (lineNumbersRef.current) lineNumbersRef.current.scrollTop = e.currentTarget.scrollTop
   }, [])
 
   useEffect(() => { setMdTab('edit'); setDiffData(null); setDiffError(''); setDiffSideBySide(false) }, [selectedFile])
@@ -97,7 +94,7 @@ const FileViewer = ({
   const syntaxStyle     = isDark ? vscDarkPlus : oneLight
 
   useEffect(() => {
-    if (lineNumbersRef.current) lineNumbersRef.current.style.transform = `translateY(${EDIT_PADDING_PX}px)`
+    if (lineNumbersRef.current) lineNumbersRef.current.scrollTop = 0
   }, [selectedFile, isEditing])
 
   const codeRenderer = useCallback(({ rows, stylesheet, useInlineStyles }) => (
@@ -180,7 +177,7 @@ const FileViewer = ({
             <div style={{ display:'flex', flex:1, overflow:'hidden', minHeight:0 }}>
               <pre ref={lineNumbersRef} style={{
                 margin: 0,
-                padding: `0 12px 0 0`,
+                padding: `${EDIT_PADDING_PX}px 12px 0 0`,
                 width: LINE_NUM_WIDTH,
                 flexShrink: 0,
                 overflow: 'hidden',
@@ -193,8 +190,6 @@ const FileViewer = ({
                 textAlign: 'right',
                 userSelect: 'none',
                 whiteSpace: 'pre',
-                transform: `translateY(${EDIT_PADDING_PX}px)`,
-                willChange: 'transform',
               }}>{lineNumbersText}</pre>
               <textarea ref={textareaRef} value={editContent} onChange={e => onEditContentChange(e.target.value)} onKeyDown={handleTextareaKeyDown}
                 onScroll={handleTextareaScroll}

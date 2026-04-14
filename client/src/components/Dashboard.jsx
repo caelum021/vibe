@@ -1,4 +1,9 @@
+import { useState, useCallback } from 'react'
 import { FONT_MONO, FONT_SERIF, SECTION_LABEL, DIVIDER, EXT_TO_LANG, LANG_COLORS, formatAge, getDocIcon, gitBadgeFor } from '../constants'
+
+const COLLAPSED_KEY = 'vibe-dashboard-collapsed'
+function loadCollapsed() { try { return new Set(JSON.parse(localStorage.getItem(COLLAPSED_KEY))) } catch { return new Set() } }
+function saveCollapsed(set) { localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...set])) }
 
 function StatCard({ value, label }) {
   return (
@@ -13,6 +18,15 @@ export default function ProjectDashboard({ data, recentChanges, onFileOpen, onRe
   if (!data) return <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100%', color:'var(--muted)', fontSize:'13px' }}>Loading…</div>
   const { projectName, projectPath, totalFiles, totalFolders, langStats, docGroups } = data
   const totalDocs = docGroups.reduce((sum, g) => sum + g.items.length, 0)
+  const [collapsed, setCollapsed] = useState(loadCollapsed)
+  const toggleGroup = useCallback((groupName) => {
+    setCollapsed(prev => {
+      const next = new Set(prev)
+      next.has(groupName) ? next.delete(groupName) : next.add(groupName)
+      saveCollapsed(next)
+      return next
+    })
+  }, [])
 
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', overflowY:'auto', padding:'32px 48px', gap:'32px', userSelect:'text', WebkitUserSelect:'text' }}>
@@ -86,18 +100,28 @@ export default function ProjectDashboard({ data, recentChanges, onFileOpen, onRe
         <div>
           <div style={SECTION_LABEL}>Documents</div>
           <div style={{ display:'flex', flexDirection:'column', gap:'4px' }}>
-            {docGroups.map((group, gi) => (
+            {docGroups.map((group, gi) => {
+              const groupKey = group.group || `__root_${gi}`
+              const isCollapsed = collapsed.has(groupKey)
+              return (
               <div key={gi} style={{ marginBottom: group.group ? '8px' : 0 }}>
                 {group.group && (
-                  <div style={{ fontFamily:FONT_SERIF, fontStyle:'italic', fontSize:'12px', color:'var(--muted)', marginBottom:'4px', paddingLeft:'4px' }}>{group.group}</div>
+                  <div onClick={() => toggleGroup(groupKey)}
+                    onMouseEnter={e => e.currentTarget.style.color = 'var(--text)'}
+                    onMouseLeave={e => e.currentTarget.style.color = 'var(--muted)'}
+                    style={{ fontFamily:FONT_SERIF, fontStyle:'italic', fontSize:'12px', color:'var(--muted)', marginBottom:'4px', paddingLeft:'4px', cursor:'pointer', display:'flex', alignItems:'center', gap:'6px', transition:'color 100ms' }}>
+                    <span style={{ fontSize:'8px', opacity:0.4, display:'inline-block', transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0)', transition:'transform 150ms' }}>▼</span>
+                    {group.group}
+                    {isCollapsed && <span style={{ fontSize:'10px', fontFamily:FONT_MONO, fontStyle:'normal' }}>({group.items.length})</span>}
+                  </div>
                 )}
-                {group.items.map(doc => {
+                {!isCollapsed && group.items.map(doc => {
                   const icon = getDocIcon(doc.name)
                   const gitState = gitInfo?.filesByAbs?.get(doc.path)
                   const badge = gitBadgeFor(gitState)
                   return (
                     <div key={doc.path} onClick={() => onFileOpen(doc)}
-                      draggable onDragStart={e => { e.dataTransfer.setData('text/plain', doc.name); e.dataTransfer.effectAllowed = 'copy' }}
+                      draggable onDragStart={e => { e.dataTransfer.setData('text/plain', doc.path); e.dataTransfer.effectAllowed = 'copy' }}
                       onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent-sub)'; e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--accent) 20%, transparent)' }}
                       onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'transparent' }}
                       style={{ display:'flex', alignItems:'center', gap:'8px', padding:'6px 8px', borderRadius:'5px', cursor:'pointer', border:'1px solid transparent', transition:'background 75ms' }}>
@@ -116,7 +140,7 @@ export default function ProjectDashboard({ data, recentChanges, onFileOpen, onRe
                   )
                 })}
               </div>
-            ))}
+            )})}
           </div>
         </div>
       )}
@@ -135,7 +159,7 @@ export default function ProjectDashboard({ data, recentChanges, onFileOpen, onRe
                 const badge = gitBadgeFor(gitState)
                 return (
                 <div key={item.path + i} onClick={() => onFileOpen(item)}
-                  draggable onDragStart={e => { e.dataTransfer.setData('text/plain', item.name); e.dataTransfer.effectAllowed = 'copy' }}
+                  draggable onDragStart={e => { e.dataTransfer.setData('text/plain', item.path); e.dataTransfer.effectAllowed = 'copy' }}
                   onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-2)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                   style={{ display:'flex', alignItems:'center', gap:'8px', padding:'5px 8px', borderRadius:'5px', cursor:'pointer', transition:'background 75ms' }}>

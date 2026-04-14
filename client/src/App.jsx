@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 import * as api from './api'
 import FileExplorer from './components/FileExplorer'
 import FileViewer from './components/FileViewer'
@@ -7,7 +8,7 @@ import NoRootScreen, { ProjectDropdown } from './components/NoRootScreen'
 import {
   resolveKey, formatReadError, FONT_MONO, FONT_UI,
   DOC_EXTENSIONS, DOC_FOLDERS, EXT_TO_LANG, LANG_COLORS,
-  RECENT_CHANGES_LIMIT, isHiddenFile, makeRecentEntry,
+  RECENT_CHANGES_LIMIT, isHiddenFile, basenameOf, makeRecentEntry,
   loadProjects, addProject,
   SHORTCUTS_VIEWER_VIEW, SHORTCUTS_VIEWER_VIEW_DIRTY, SHORTCUTS_VIEWER_DIFF,
   SHORTCUTS_VIEWER_EDIT, SHORTCUTS_VIEWER_EDIT_MD, SHORTCUTS_EXPLORER,
@@ -172,7 +173,7 @@ function App() {
         .slice(0, RECENT_CHANGES_LIMIT)
         .map(f => makeRecentEntry(f.path, f.modifiedMs))
       setRecentChanges(recentFiles)
-      setDashboardData({ projectName: rootPath_.split('/').pop() || 'project', projectPath: rootPath_, totalFiles: allFiles.length, totalFolders, langStats, docGroups })
+      setDashboardData({ projectName: basenameOf(rootPath_) || 'project', projectPath: rootPath_, totalFiles: allFiles.length, totalFolders, langStats, docGroups })
     } catch (e) { console.error('Dashboard load failed:', e) }
   }, [])
 
@@ -280,6 +281,7 @@ function App() {
     setDashboardData(null)
     setGitInfo({ isRepo: false, branch: null, filesByAbs: new Map(), dirtyCount: 0 })
     setRootPath(path)
+    getCurrentWindow().setTitle(`vibe — ${basenameOf(path)}`)
     const list = addProject(path)
     setProjects(list)
     setRefreshKey(k => k + 1)
@@ -288,7 +290,7 @@ function App() {
 
   useEffect(() => {
     api.getRoot().then(r => {
-      if (r) { const list = addProject(r); setProjects(list) }
+      if (r) { const list = addProject(r); setProjects(list); getCurrentWindow().setTitle(`vibe — ${basenameOf(r)}`) }
       setRootReady(!!r); setRootPath(r || '')
     }).catch(() => setRootReady(false))
   }, [])
@@ -305,15 +307,18 @@ function App() {
         setRefreshKey(k => k + 1)
         setChangedFiles(prev => { const n = new Set(prev); paths.forEach(p => n.add(p)); return n })
         const now = Date.now()
-        const newEntries = paths.map(p => makeRecentEntry(p, now))
-        setRecentChanges(prev => [...newEntries, ...prev.filter(e => !paths.includes(e.path))].slice(0, RECENT_CHANGES_LIMIT))
-        // Fetch line counts async (batched update)
-        Promise.all(newEntries.map(entry =>
-          api.readFile(entry.path).then(d => ({ path: entry.path, time: entry.time, lineCount: (d.content || '').split('\n').length })).catch(() => null)
-        )).then(results => {
-          const counts = Object.fromEntries(results.filter(Boolean).map(r => [r.path + r.time, r.lineCount]))
-          if (Object.keys(counts).length > 0) setRecentChanges(prev => prev.map(e => counts[e.path + e.time] ? { ...e, lineCount: counts[e.path + e.time] } : e))
-        })
+        const filtered = paths.filter(p => !isHiddenFile({ name: basenameOf(p) }))
+        if (filtered.length > 0) {
+          const filteredSet = new Set(filtered)
+          const newEntries = filtered.map(p => makeRecentEntry(p, now))
+          setRecentChanges(prev => [...newEntries, ...prev.filter(e => !filteredSet.has(e.path))].slice(0, RECENT_CHANGES_LIMIT))
+          Promise.all(newEntries.map(entry =>
+            api.readFile(entry.path).then(d => ({ path: entry.path, time: entry.time, lineCount: (d.content || '').split('\n').length })).catch(() => null)
+          )).then(results => {
+            const counts = Object.fromEntries(results.filter(Boolean).map(r => [r.path + r.time, r.lineCount]))
+            if (Object.keys(counts).length > 0) setRecentChanges(prev => prev.map(e => counts[e.path + e.time] ? { ...e, lineCount: counts[e.path + e.time] } : e))
+          })
+        }
         // Debounced dashboard refresh on file changes
         if (dashboardRefetchTimerRef.current) clearTimeout(dashboardRefetchTimerRef.current)
         dashboardRefetchTimerRef.current = setTimeout(() => loadDashboard(), 2000)

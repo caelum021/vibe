@@ -207,8 +207,7 @@ const FileExplorer = ({ onFileSelect, isFocused, onFocus, innerRef, onAtRootChan
   const copyPath = useCallback(() => {
     const item = visibleItems[selectedIndex]
     if (!item) return
-    const rel = item.path.replace(rootPathRef.current + '/', '').replace(rootPathRef.current, '.')
-    navigator.clipboard.writeText(rel)
+    navigator.clipboard.writeText(item.path)
   }, [visibleItems, selectedIndex])
 
   // Keyboard handling
@@ -329,7 +328,7 @@ const FileExplorer = ({ onFileSelect, isFocused, onFocus, innerRef, onAtRootChan
               ) : (
                 <div
                   draggable={!item.isDirectory}
-                  onDragStart={e => { e.dataTransfer.setData('text/plain', item.name); e.dataTransfer.effectAllowed = 'copy' }}
+                  onDragStart={e => { e.dataTransfer.setData('text/plain', item.path); e.dataTransfer.effectAllowed = 'copy' }}
                   onClick={() => { setSelectedIndex(idx); if (item.isDirectory) toggleDir(item.path); else onFileSelect(item) }}
                   onMouseEnter={() => setHoveredPath(item.path)}
                   onMouseLeave={() => setHoveredPath(null)}
