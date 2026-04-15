@@ -54,6 +54,6 @@ jobs:
           releaseName: 'Vibe ${{ github.ref_name }}'
           releaseBody: |
             See the [full changelog](https://github.com/solpop-arch/vibe/commits/${{ github.ref_name }}).
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
