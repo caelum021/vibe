@@ -13,6 +13,8 @@ Your window into AI-native coding.
   <img src="./assets/screenshot-dark.png" width="720" alt="Vibe — dark mode" />
 </p>
 
+<br>
+
 ## What is Vibe?
 
 When you code with AI, the real collaboration happens through documents. Existing IDEs are bloated with debugging and compilation tools you no longer need. Vibe strips all that away — just documents, edits, and context.
@@ -20,6 +22,8 @@ When you code with AI, the real collaboration happens through documents. Existin
 - **Documents are the interface** — Write specs, review AI output, edit files to steer direction. That's the workflow.
 - **Always on** — Auto-refreshes when AI changes files. Monitor scope and content in real time.
 - **Light and fast** — Tauri native app. ~2MB DMG. No debugger, no compiler, no bloat.
+
+<br>
 
 ## Installation
 
@@ -45,6 +49,8 @@ The built app is generated at `src-tauri/target/release/bundle/`.
 npx @tauri-apps/cli@^2 dev
 ```
 
+<br>
+
 ## Usage
 
 ```bash
@@ -57,6 +63,8 @@ vibe .
 # No argument → folder picker dialog
 vibe
 ```
+
+<br>
 
 ## Features
 
@@ -72,9 +80,13 @@ vibe
 | **Multi-Project** | Register multiple projects, switch with Cmd+1-9 or footer dropdown |
 | **Dark Mode** | Warm dark theme (walnut, not cold slate), toggle with Ctrl+Shift+L |
 
+<br>
+
 ## Design
 
 Warm, minimal aesthetic. Aged-paper light theme, warm-walnut dark theme. Rust/ember accent for active states. Typography: Instrument Serif (directories), Geist (UI), JetBrains Mono (code).
+
+<br>
 
 ## Keyboard Shortcuts
 
@@ -84,15 +96,20 @@ Warm, minimal aesthetic. Aged-paper light theme, warm-walnut dark theme. Rust/em
 | `Enter` | Open file / Toggle fullscreen |
 | `Backspace` | Parent directory |
 | `E` | Edit mode |
+| `D` | Diff view |
 | `Ctrl+S` | Save |
 | `Ctrl+B` | Toggle sidebar |
+| `Ctrl+R` | Refresh |
 | `Ctrl+Shift+L` | Toggle dark mode |
 | `Cmd+1-9` | Switch between projects |
 | `A` / `Shift+A` | New file / New folder |
 | `R` | Rename |
 | `Del` | Delete |
 | `C` | Copy path |
+| `Space` / `Shift+Space` | Page scroll |
 | `Esc` | Close / Back |
+
+<br>
 
 ## Tech Stack
 
@@ -106,27 +123,7 @@ Warm, minimal aesthetic. Aged-paper light theme, warm-walnut dark theme. Rust/em
 | File Watching | notify crate (OS-native) |
 | Git | git2 (libgit2) |
 
-## Project Structure
-
-```
-vibe/
-├── src-tauri/           # Rust backend
-│   ├── src/
-│   │   ├── commands/    # Tauri commands (file ops, watcher, dialog, git)
-│   │   ├── watcher/     # File system watcher with debounce
-│   │   ├── constants.rs # Shared constants
-│   │   ├── error.rs     # Error types
-│   │   ├── state.rs     # App state management
-│   │   └── lib.rs       # App setup
-│   ├── Cargo.toml
-│   └── tauri.conf.json
-├── client/              # React frontend
-│   ├── src/
-│   │   ├── App.jsx      # Main UI component
-│   │   └── api.js       # Tauri IPC layer
-│   └── package.json
-└── README.md
-```
+<br>
 
 ## License
 

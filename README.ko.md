@@ -9,6 +9,8 @@ AI와 코딩할 때 실제 협업은 문서를 통해 이루어집니다. 기존
   <img src="./assets/screenshot-dark.png" width="720" alt="Vibe — 다크 모드" />
 </p>
 
+<br>
+
 ## 시작하기
 
 ### 필수 조건
@@ -33,6 +35,8 @@ npx @tauri-apps/cli@^2 build
 npx @tauri-apps/cli@^2 dev
 ```
 
+<br>
+
 ## 사용법
 
 ```bash
@@ -45,6 +49,8 @@ vibe .
 # 폴더 지정 없이 실행 → 폴더 선택 다이얼로그
 vibe
 ```
+
+<br>
 
 ## 주요 기능
 
@@ -60,9 +66,13 @@ vibe
 | **멀티 프로젝트** | 여러 프로젝트 등록, Cmd+1-9 또는 하단 드롭다운으로 전환 |
 | **다크 모드** | 따뜻한 다크 테마 (월넛 톤), Ctrl+Shift+L로 전환 |
 
+<br>
+
 ## 디자인
 
 따뜻하고 미니멀한 미학. 오래된 종이 느낌의 라이트 테마, 따뜻한 월넛 톤의 다크 테마. 활성 상태에 러스트/엠버 액센트. 타이포그래피: Instrument Serif (디렉토리), Geist (UI), JetBrains Mono (코드).
+
+<br>
 
 ## 단축키
 
@@ -72,15 +82,20 @@ vibe
 | `Enter` | 파일 열기 / 풀스크린 토글 |
 | `Backspace` | 상위 디렉토리 |
 | `E` | 편집 모드 |
+| `D` | Diff 보기 |
 | `Ctrl+S` | 저장 |
 | `Ctrl+B` | 사이드바 토글 |
+| `Ctrl+R` | 새로고침 |
 | `Ctrl+Shift+L` | 다크 모드 전환 |
 | `Cmd+1-9` | 프로젝트 전환 |
 | `A` / `Shift+A` | 새 파일 / 새 폴더 |
 | `R` | 이름 변경 |
 | `Del` | 삭제 |
 | `C` | 경로 복사 |
+| `Space` / `Shift+Space` | 페이지 스크롤 |
 | `Esc` | 닫기 / 뒤로 |
+
+<br>
 
 ## 기술 스택
 
@@ -93,6 +108,8 @@ vibe
 | 코드 하이라이트 | react-syntax-highlighter (Prism) |
 | 파일 감시 | notify crate (OS 네이티브) |
 | Git | git2 (libgit2) |
+
+<br>
 
 ## 라이선스
 
