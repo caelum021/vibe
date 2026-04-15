@@ -6,6 +6,8 @@ Your window into AI-native coding.
 
 [한국어 설명 (Korean README)](./README.ko.md)
 
+When AI changes your code, vibe lets you see what happened, review the diff, and edit files to steer direction — all in real time. No debugger, no compiler. Just documents, edits, and context.
+
 <p align="center">
   <img src="./assets/screenshot-light.png" width="720" alt="Vibe — light mode" />
 </p>
@@ -15,76 +17,44 @@ Your window into AI-native coding.
 
 <br>
 
-## What is Vibe?
+## Install
 
-When you code with AI, the real collaboration happens through documents. Existing IDEs are bloated with debugging and compilation tools you no longer need. Vibe strips all that away — just documents, edits, and context.
+Download the latest version from [GitHub Releases](https://github.com/solpop-arch/vibe/releases).
 
-- **Documents are the interface** — Write specs, review AI output, edit files to steer direction. That's the workflow.
-- **Always on** — Auto-refreshes when AI changes files. Monitor scope and content in real time.
-- **Light and fast** — Tauri native app. ~2MB DMG. No debugger, no compiler, no bloat.
+- **macOS (Apple Silicon)**: `vibe_x.x.x_aarch64.dmg`
+- **macOS (Intel)**: `vibe_x.x.x_x64.dmg`
+- **Windows**: `vibe_x.x.x_x64-setup.exe`
+- **Linux**: `vibe_x.x.x_amd64.AppImage`
+
+On macOS, open the DMG and drag the app to your Applications folder.
 
 <br>
 
-## Installation
+## What you can do
 
-### Prerequisites
+**Browse and edit files** — Explore your project as a file tree. Markdown is rendered, code is syntax-highlighted. Edit and save in place.
 
-- [Rust](https://rustup.rs/) (1.70+)
-- [Node.js](https://nodejs.org/) (18+)
+**See AI changes in real time** — When an AI CLI like Claude Code modifies a file, vibe auto-refreshes. If you're editing, it shows a "changed externally" badge instead of overwriting your work.
 
-### Build from source
+**Git diff** — See which files changed with status badges. View diffs inline or side-by-side.
 
-```bash
-git clone https://github.com/solpop-arch/vibe.git
-cd vibe
-cd client && npm install && cd ..
-npx @tauri-apps/cli@^2 build
-```
+**Project dashboard** — Language breakdown, document groups, and recently changed files at a glance.
 
-The built app is generated at `src-tauri/target/release/bundle/`.
+**Multiple projects** — Register projects and switch between them with Cmd+1–9.
 
-### Development
-
-```bash
-npx @tauri-apps/cli@^2 dev
-```
+**Dark mode** — Warm walnut-toned dark theme. Toggle with Ctrl+Shift+L.
 
 <br>
 
 ## Usage
 
+Open the app and pick a folder. Or launch from the terminal:
+
 ```bash
-# Open a specific project folder
-vibe /path/to/project
-
-# Open current directory
-vibe .
-
-# No argument → folder picker dialog
-vibe
+vibe /path/to/project    # Open a specific folder
+vibe .                   # Open current directory
+vibe                     # Folder picker dialog
 ```
-
-<br>
-
-## Features
-
-| Feature | Description |
-|---|---|
-| **File Explorer** | Project file tree with keyboard navigation, Instrument Serif italic directory names |
-| **File Viewer** | Markdown rendering, syntax highlighting, line numbers |
-| **File Editing** | Inline edit mode, Ctrl+S to save |
-| **File Watching** | Auto-refresh on file changes (150ms debounce), change badges with pulse animation |
-| **Git Integration** | Per-file status badges (modified/added/deleted), inline diff view for changed files |
-| **File Operations** | Create, rename, delete files and folders |
-| **Project Dashboard** | Language distribution bar, document grouping, recently changed files |
-| **Multi-Project** | Register multiple projects, switch with Cmd+1-9 or footer dropdown |
-| **Dark Mode** | Warm dark theme (walnut, not cold slate), toggle with Ctrl+Shift+L |
-
-<br>
-
-## Design
-
-Warm, minimal aesthetic. Aged-paper light theme, warm-walnut dark theme. Rust/ember accent for active states. Typography: Instrument Serif (directories), Geist (UI), JetBrains Mono (code).
 
 <br>
 
@@ -93,7 +63,7 @@ Warm, minimal aesthetic. Aged-paper light theme, warm-walnut dark theme. Rust/em
 | Key | Action |
 |---|---|
 | `Arrow Up/Down` | Navigate files |
-| `Enter` | Open file / Toggle fullscreen |
+| `Enter` | Open file |
 | `Backspace` | Parent directory |
 | `E` | Edit mode |
 | `D` | Diff view |
@@ -111,17 +81,38 @@ Warm, minimal aesthetic. Aged-paper light theme, warm-walnut dark theme. Rust/em
 
 <br>
 
-## Tech Stack
+## Build from source
 
-| Component | Technology |
-|---|---|
-| App Framework | Tauri v2 |
-| Backend | Rust |
-| Frontend | React + Vite |
-| Markdown | react-markdown + remark-gfm |
-| Code Highlight | react-syntax-highlighter (Prism) |
-| File Watching | notify crate (OS-native) |
-| Git | git2 (libgit2) |
+<details>
+<summary>For developers — click to expand</summary>
+
+### Prerequisites
+
+- [Rust](https://rustup.rs/) (1.70+)
+- [Node.js](https://nodejs.org/) (18+)
+
+### Build
+
+```bash
+git clone https://github.com/solpop-arch/vibe.git
+cd vibe
+cd client && npm install && cd ..
+npx @tauri-apps/cli@^2 build
+```
+
+The built app is generated at `src-tauri/target/release/bundle/`.
+
+### Development
+
+```bash
+npx @tauri-apps/cli@^2 dev
+```
+
+### Tech Stack
+
+Tauri v2 · Rust · React + Vite · react-markdown · react-syntax-highlighter · notify crate · git2 (libgit2)
+
+</details>
 
 <br>
 

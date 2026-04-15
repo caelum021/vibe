@@ -1,6 +1,9 @@
 # vibe — AI와 코딩할 때, 문서로 소통하는 도구
 
-AI와 코딩할 때 실제 협업은 문서를 통해 이루어집니다. 기존 IDE는 디버깅·컴파일 기능이 무겁지만, AI 협업에는 그게 필요 없습니다. **vibe**는 문서 작성·편집·변경 맥락 파악에 집중하는 초경량 Tauri v2 데스크톱 앱입니다. AI CLI(Claude Code 등)의 변경을 실시간으로 모니터하고, 수정 범위와 내용을 확인하며, 파일을 직접 수정해서 바로바로 피드백할 수 있습니다.
+**vibe .** 그게 전부입니다.
+
+AI가 코드를 바꾸면, vibe에서 바로 확인하고, 직접 고쳐서 방향을 잡습니다.
+디버거도 컴파일러도 없습니다. 문서를 쓰고, 읽고, 고치는 것. 그게 AI와의 협업입니다.
 
 <p align="center">
   <img src="./assets/screenshot-light.png" width="720" alt="Vibe — 라이트 모드" />
@@ -11,66 +14,44 @@ AI와 코딩할 때 실제 협업은 문서를 통해 이루어집니다. 기존
 
 <br>
 
-## 시작하기
+## 설치
 
-### 필수 조건
+[GitHub Releases](https://github.com/solpop-arch/vibe/releases)에서 최신 버전을 다운로드하세요.
 
-- [Rust](https://rustup.rs/) (1.70+)
-- [Node.js](https://nodejs.org/) (18+)
+- **macOS (Apple Silicon)**: `vibe_x.x.x_aarch64.dmg`
+- **macOS (Intel)**: `vibe_x.x.x_x64.dmg`
+- **Windows**: `vibe_x.x.x_x64-setup.exe`
+- **Linux**: `vibe_x.x.x_amd64.AppImage`
 
-### 소스에서 빌드
+macOS는 DMG를 열고 앱을 Applications 폴더로 드래그하면 됩니다.
 
-```bash
-git clone https://github.com/solpop-arch/vibe.git
-cd vibe
-cd client && npm install && cd ..
-npx @tauri-apps/cli@^2 build
-```
+<br>
 
-빌드된 앱은 `src-tauri/target/release/bundle/`에 생성됩니다.
+## 이런 걸 할 수 있습니다
 
-### 개발 모드
+**파일 탐색과 편집** — 프로젝트 파일을 트리로 탐색하고, 마크다운은 렌더링해서 보여주고, 코드는 구문 강조로 보여줍니다. 바로 편집하고 저장할 수 있습니다.
 
-```bash
-npx @tauri-apps/cli@^2 dev
-```
+**AI 변경 실시간 감지** — Claude Code 같은 AI CLI가 파일을 수정하면 자동으로 새로고침됩니다. 편집 중이면 "changed externally" 배지로 알려줍니다.
+
+**Git diff** — 어떤 파일이 바뀌었는지 뱃지로 표시하고, 변경 내용을 인라인 또는 나란히 diff로 볼 수 있습니다.
+
+**프로젝트 대시보드** — 언어 분포, 문서 목록, 최근 변경된 파일을 한눈에 봅니다.
+
+**여러 프로젝트** — 프로젝트를 등록해두고 Cmd+1~9로 빠르게 전환합니다.
+
+**다크 모드** — 따뜻한 월넛 톤의 다크 테마. Ctrl+Shift+L로 전환.
 
 <br>
 
 ## 사용법
 
+앱을 열면 폴더 선택 화면이 나옵니다. 터미널에서 실행할 수도 있습니다:
+
 ```bash
-# 프로젝트 폴더를 지정해서 실행
-vibe /path/to/project
-
-# 현재 디렉토리에서 실행
-vibe .
-
-# 폴더 지정 없이 실행 → 폴더 선택 다이얼로그
-vibe
+vibe /path/to/project    # 특정 폴더 열기
+vibe .                   # 현재 폴더 열기
+vibe                     # 폴더 선택 다이얼로그
 ```
-
-<br>
-
-## 주요 기능
-
-| 기능 | 설명 |
-|---|---|
-| **파일 탐색기** | 프로젝트 파일 트리 탐색, 키보드 네비게이션, Instrument Serif 이탤릭 디렉토리명 |
-| **파일 뷰어** | 마크다운 렌더링, 코드 구문 강조, 줄 번호 |
-| **파일 편집** | 즉석 편집 모드, Ctrl+S 저장 |
-| **파일 감시** | AI가 파일 수정 시 자동 새로고침, 변경 뱃지 펄스 애니메이션 |
-| **Git 연동** | 파일별 상태 뱃지 (수정/추가/삭제), 변경된 파일의 인라인 diff 뷰 |
-| **파일 관리** | 파일/폴더 생성, 이름 변경, 삭제 |
-| **프로젝트 대시보드** | 언어 분포 바, 문서 그룹핑, 최근 변경 파일 |
-| **멀티 프로젝트** | 여러 프로젝트 등록, Cmd+1-9 또는 하단 드롭다운으로 전환 |
-| **다크 모드** | 따뜻한 다크 테마 (월넛 톤), Ctrl+Shift+L로 전환 |
-
-<br>
-
-## 디자인
-
-따뜻하고 미니멀한 미학. 오래된 종이 느낌의 라이트 테마, 따뜻한 월넛 톤의 다크 테마. 활성 상태에 러스트/엠버 액센트. 타이포그래피: Instrument Serif (디렉토리), Geist (UI), JetBrains Mono (코드).
 
 <br>
 
@@ -79,7 +60,7 @@ vibe
 | 키 | 동작 |
 |---|---|
 | `↑↓` | 파일 탐색 |
-| `Enter` | 파일 열기 / 풀스크린 토글 |
+| `Enter` | 파일 열기 |
 | `Backspace` | 상위 디렉토리 |
 | `E` | 편집 모드 |
 | `D` | Diff 보기 |
@@ -97,17 +78,38 @@ vibe
 
 <br>
 
-## 기술 스택
+## 소스에서 빌드하기
 
-| 구성 요소 | 기술 |
-|---|---|
-| 앱 프레임워크 | Tauri v2 |
-| 백엔드 | Rust |
-| 프론트엔드 | React + Vite |
-| 마크다운 | react-markdown + remark-gfm |
-| 코드 하이라이트 | react-syntax-highlighter (Prism) |
-| 파일 감시 | notify crate (OS 네이티브) |
-| Git | git2 (libgit2) |
+<details>
+<summary>개발자용 — 클릭해서 펼치기</summary>
+
+### 필수 조건
+
+- [Rust](https://rustup.rs/) (1.70+)
+- [Node.js](https://nodejs.org/) (18+)
+
+### 빌드
+
+```bash
+git clone https://github.com/solpop-arch/vibe.git
+cd vibe
+cd client && npm install && cd ..
+npx @tauri-apps/cli@^2 build
+```
+
+빌드된 앱은 `src-tauri/target/release/bundle/`에 생성됩니다.
+
+### 개발 모드
+
+```bash
+npx @tauri-apps/cli@^2 dev
+```
+
+### 기술 스택
+
+Tauri v2 · Rust · React + Vite · react-markdown · react-syntax-highlighter · notify crate · git2 (libgit2)
+
+</details>
 
 <br>
 
