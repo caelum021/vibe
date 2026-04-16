@@ -77,6 +77,8 @@
       ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
       ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
       ::selection { background: var(--accent-sub); color: var(--text); }
+      mark[data-md-match] { background: var(--search-match); color: inherit; padding: 0; border-radius: 2px; }
+      mark[data-md-match][data-current="true"] { background: var(--search-current); }
     </style>
   </head>
   <body>

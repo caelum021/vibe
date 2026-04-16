@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { oneLight }    from 'react-syntax-highlighter/dist/esm/styles/prism'
@@ -53,10 +53,83 @@ function makeMarkdownComponents(isDark, fileDirPath) {
   }
 }
 
-export default function MarkdownView({ content, isDark, fileDirPath }) {
+export default function MarkdownView({ content, isDark, fileDirPath, searchQuery = '', currentMatchIdx = 0, onMatchesFound }) {
   const components = useMemo(() => makeMarkdownComponents(isDark, fileDirPath), [isDark, fileDirPath])
+  const containerRef = useRef(null)
+  const currentMarkRef = useRef(null)
+
+  // ReactMarkdown renders synchronously, so the DOM is ready once this effect runs.
+  // Mark highlight color lives in CSS vars (index.html), so isDark intentionally not a dep.
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    const prevParents = new Set()
+    container.querySelectorAll('mark[data-md-match]').forEach(m => {
+      const parent = m.parentNode
+      if (!parent) return
+      parent.replaceChild(document.createTextNode(m.textContent), m)
+      prevParents.add(parent)
+    })
+    prevParents.forEach(p => p.normalize())
+    currentMarkRef.current = null
+
+    if (!searchQuery) {
+      onMatchesFound?.(0)
+      return
+    }
+
+    const q = searchQuery.toLowerCase()
+    const qlen = q.length
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
+      acceptNode: (n) => (n.nodeValue ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT)
+    })
+    const nodes = []
+    let cur
+    while ((cur = walker.nextNode())) nodes.push(cur)
+
+    let count = 0
+    for (const node of nodes) {
+      const text = node.nodeValue
+      const lower = text.toLowerCase()
+      if (lower.indexOf(q) === -1) continue
+      const frag = document.createDocumentFragment()
+      let i = 0, pos
+      while ((pos = lower.indexOf(q, i)) !== -1) {
+        if (pos > i) frag.appendChild(document.createTextNode(text.slice(i, pos)))
+        const mark = document.createElement('mark')
+        mark.setAttribute('data-md-match', '')
+        mark.textContent = text.slice(pos, pos + qlen)
+        frag.appendChild(mark)
+        count++
+        i = pos + qlen
+      }
+      if (i < text.length) frag.appendChild(document.createTextNode(text.slice(i)))
+      node.parentNode?.replaceChild(frag, node)
+    }
+
+    onMatchesFound?.(count)
+  // onMatchesFound is a stable useState setter by contract; excluded from deps intentionally
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, content])
+
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+    const marks = container.querySelectorAll('mark[data-md-match]')
+    if (marks.length === 0) { currentMarkRef.current = null; return }
+    const next = marks[currentMatchIdx]
+    const prev = currentMarkRef.current
+    if (prev && prev !== next) prev.removeAttribute('data-current')
+    if (next) {
+      next.setAttribute('data-current', 'true')
+      next.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    }
+    currentMarkRef.current = next || null
+  }, [currentMatchIdx, searchQuery, content])
+
   return (
-    <div style={{ color:'var(--text)', lineHeight:'1.75', fontSize:'14px', maxWidth:'72ch' }}>
+    <div ref={containerRef} style={{ color:'var(--text)', lineHeight:'1.75', fontSize:'14px', maxWidth:'72ch' }}>
       <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]} components={components}>{content}</ReactMarkdown>
     </div>
   )

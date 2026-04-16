@@ -14,7 +14,7 @@ const FileViewer = ({
   onEditContentChange, onEnterEdit, onExitEdit, onSave,
   isFocused, onFocus, onClose, innerRef,
   gitDirty, diffMode, onEnterDiff, onExitDiff,
-  externallyChanged, onReload, openSearchRef,
+  externallyChanged, onReload, openSearchRef, closeSearchRef,
 }) => {
   const [mdTab, setMdTab] = useState('edit')
   const [diffData, setDiffData] = useState(null)
@@ -29,6 +29,7 @@ const FileViewer = ({
   const lineNumbersRef    = useRef(null)
   const searchInputRef    = useRef(null)
   const listRef           = useRef(null)
+  const lastViewScrollRef = useRef(null)  // { type:'code', line } | { type:'md', ratio }
   const ext = selectedFile?.name.split('.').pop()?.toLowerCase() ?? ''
   const langBadge = EXT_TO_DISPLAY[ext] || ext || '—'
 
@@ -36,9 +37,10 @@ const FileViewer = ({
     if (lineNumbersRef.current) lineNumbersRef.current.scrollTop = e.currentTarget.scrollTop
   }, [])
 
-  // Search matches (line indices) computed from content
+  const [mdMatchCount, setMdMatchCount] = useState(0)
+
   const searchMatches = useMemo(() => {
-    if (!searchQuery || !content) return []
+    if (!searchQuery || !content || isMd) return []
     const q = searchQuery.toLowerCase()
     const lines = content.split('\n')
     const matches = []
@@ -46,30 +48,31 @@ const FileViewer = ({
       if (lines[i].toLowerCase().includes(q)) matches.push(i)
     }
     return matches
-  }, [searchQuery, content])
+  }, [searchQuery, content, isMd])
 
-  // Clamp currentMatchIdx when matches change
-  useEffect(() => {
-    if (searchMatches.length === 0) setCurrentMatchIdx(0)
-    else if (currentMatchIdx >= searchMatches.length) setCurrentMatchIdx(0)
-  }, [searchMatches.length])
+  const totalMatches = isMd ? mdMatchCount : searchMatches.length
 
-  // Scroll to current match
   useEffect(() => {
+    if (totalMatches === 0) setCurrentMatchIdx(0)
+    else if (currentMatchIdx >= totalMatches) setCurrentMatchIdx(0)
+  }, [totalMatches])
+
+  useEffect(() => {
+    if (isMd) return
     if (searchMatches.length > 0 && listRef.current) {
       listRef.current.scrollToRow({ index: searchMatches[currentMatchIdx], align: 'center' })
     }
-  }, [currentMatchIdx, searchMatches])
+  }, [currentMatchIdx, searchMatches, isMd])
 
   const searchNext = useCallback(() => {
-    if (searchMatches.length === 0) return
-    setCurrentMatchIdx(i => (i + 1) % searchMatches.length)
-  }, [searchMatches])
+    if (totalMatches === 0) return
+    setCurrentMatchIdx(i => (i + 1) % totalMatches)
+  }, [totalMatches])
 
   const searchPrev = useCallback(() => {
-    if (searchMatches.length === 0) return
-    setCurrentMatchIdx(i => (i - 1 + searchMatches.length) % searchMatches.length)
-  }, [searchMatches])
+    if (totalMatches === 0) return
+    setCurrentMatchIdx(i => (i - 1 + totalMatches) % totalMatches)
+  }, [totalMatches])
 
   const openSearch = useCallback(() => {
     setSearchOpen(true)
@@ -87,6 +90,16 @@ const FileViewer = ({
     setCurrentMatchIdx(0)
   }, [])
 
+  // Expose "close if open" so the parent's Esc path can swallow before closing the file
+  useEffect(() => {
+    if (!closeSearchRef) return
+    closeSearchRef.current = () => {
+      if (!searchOpen) return false
+      closeSearch()
+      return true
+    }
+  }, [closeSearchRef, searchOpen, closeSearch])
+
   const copyAll = useCallback(() => {
     if (!content) return
     navigator.clipboard.writeText(content).then(() => {
@@ -95,8 +108,39 @@ const FileViewer = ({
     })
   }, [content])
 
-  useEffect(() => { setMdTab('edit'); setDiffData(null); setDiffError(''); setDiffSideBySide(false); closeSearch() }, [selectedFile])
-  useEffect(() => { if (isEditing && textareaRef.current) textareaRef.current.focus() }, [isEditing])
+  useEffect(() => { setMdTab('edit'); setDiffData(null); setDiffError(''); setDiffSideBySide(false); closeSearch(); lastViewScrollRef.current = null }, [selectedFile])
+
+  // Order matters: scrollTop MUST be set before focus. focus() triggers the browser's
+  // auto-scroll-to-caret which otherwise clobbers our target. preventScroll is a
+  // second guard against that.
+  useEffect(() => {
+    if (!isEditing) return
+    const last = lastViewScrollRef.current
+    requestAnimationFrame(() => {
+      const el = textareaRef.current
+      if (!el) return
+      if (last) {
+        if (last.type === 'code') {
+          el.scrollTop = Math.max(0, last.line * LINE_HEIGHT_PX)
+        } else if (last.type === 'md') {
+          const denom = el.scrollHeight - el.clientHeight
+          if (denom > 0) el.scrollTop = Math.max(0, Math.round(last.ratio * denom))
+        }
+      }
+      el.focus({ preventScroll: true })
+    })
+  }, [isEditing])
+
+  const handleMdScroll = useCallback((e) => {
+    const el = e.currentTarget
+    const denom = el.scrollHeight - el.clientHeight
+    const ratio = denom > 0 ? Math.max(0, Math.min(1, el.scrollTop / denom)) : 0
+    lastViewScrollRef.current = { type: 'md', ratio }
+  }, [])
+
+  const handleRowsRendered = useCallback(({ startIndex }) => {
+    lastViewScrollRef.current = { type: 'code', line: startIndex }
+  }, [])
 
   // Fetch diff when entering diff mode (or when file re-changes while already in diff).
   useEffect(() => {
@@ -147,6 +191,7 @@ const FileViewer = ({
   const showEditPane    = isEditing && (!isMd || mdTab === 'edit')
   const showPreviewPane = isEditing && isMd && mdTab === 'preview'
   const isCodeView      = !!selectedFile && !isMd && !showEditPane && !showPreviewPane && !showDiff
+  const canSearch       = !!selectedFile && !showEditPane && !showPreviewPane && !showDiff
   const isFlexLayout    = showEditPane || isCodeView || showDiff
   const activeContent   = isEditing ? editContent : content
   const lineCount       = useMemo(() => {
@@ -175,9 +220,10 @@ const FileViewer = ({
       rowProps={{ rows, stylesheet, useInlineStyles, searchMatchSet, currentMatchLine }}
       rowComponent={CodeRow}
       overscanCount={5}
+      onRowsRendered={handleRowsRendered}
       style={{ overflowX: 'auto' }}
     />
-  ), [searchMatchSet, currentMatchLine])
+  ), [searchMatchSet, currentMatchLine, handleRowsRendered])
 
   return (
     <div ref={innerRef} tabIndex={0} onFocus={onFocus} style={{ display:'flex', flexDirection:'column', height:'100%', outline:'none', background:'var(--surface)' }}>
@@ -242,7 +288,7 @@ const FileViewer = ({
       </div>
 
       {/* Search bar */}
-      {searchOpen && isCodeView && (
+      {searchOpen && canSearch && (
         <div style={{ height:'32px', minHeight:'32px', borderBottom:'1px solid var(--border)', display:'flex', alignItems:'center', padding:'0 16px', gap:'8px', flexShrink:0, background:'var(--surface-2)' }}>
           <input
             ref={searchInputRef}
@@ -250,23 +296,28 @@ const FileViewer = ({
             onChange={e => { setSearchQuery(e.target.value); setCurrentMatchIdx(0) }}
             onKeyDown={e => {
               if (e.key === 'Enter') { e.preventDefault(); e.shiftKey ? searchPrev() : searchNext() }
-              else if (e.key === 'Escape') { e.preventDefault(); closeSearch() }
+              else if (e.key === 'Escape') {
+                e.preventDefault()
+                e.stopPropagation()
+                e.nativeEvent.stopImmediatePropagation()
+                closeSearch()
+              }
             }}
             placeholder="Search…"
             spellCheck={false}
             style={{ flex:'0 1 240px', background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'4px', padding:'4px 8px', fontSize:'12px', fontFamily:FONT_MONO, color:'var(--text)', outline:'none' }}
           />
           <span style={{ fontSize:'11px', color:'var(--muted)', fontFamily:FONT_MONO, minWidth:'48px' }}>
-            {searchQuery ? `${searchMatches.length > 0 ? currentMatchIdx + 1 : 0}/${searchMatches.length}` : ''}
+            {searchQuery ? `${totalMatches > 0 ? currentMatchIdx + 1 : 0}/${totalMatches}` : ''}
           </span>
-          <button onClick={searchPrev} disabled={searchMatches.length === 0} style={{ background:'none', border:'none', color: searchMatches.length > 0 ? 'var(--text)' : 'var(--muted)', cursor:'pointer', fontSize:'12px', padding:'4px 6px', lineHeight:1 }}>&#x25B2;</button>
-          <button onClick={searchNext} disabled={searchMatches.length === 0} style={{ background:'none', border:'none', color: searchMatches.length > 0 ? 'var(--text)' : 'var(--muted)', cursor:'pointer', fontSize:'12px', padding:'4px 6px', lineHeight:1 }}>&#x25BC;</button>
+          <button onClick={searchPrev} disabled={totalMatches === 0} style={{ background:'none', border:'none', color: totalMatches > 0 ? 'var(--text)' : 'var(--muted)', cursor:'pointer', fontSize:'12px', padding:'4px 6px', lineHeight:1 }}>&#x25B2;</button>
+          <button onClick={searchNext} disabled={totalMatches === 0} style={{ background:'none', border:'none', color: totalMatches > 0 ? 'var(--text)' : 'var(--muted)', cursor:'pointer', fontSize:'12px', padding:'4px 6px', lineHeight:1 }}>&#x25BC;</button>
           <button onClick={closeSearch} style={{ background:'none', border:'none', color:'var(--muted)', cursor:'pointer', fontSize:'14px', padding:'4px 6px', lineHeight:1 }}>&times;</button>
         </div>
       )}
 
       {/* Content — code viewer & edit pane fill via flex; markdown flows in scroll container. */}
-      <div data-scroll-container style={{ flex:1, overflow: isFlexLayout ? 'hidden' : 'auto', padding: isFlexLayout ? '0' : isMd ? '24px 32px' : '0', display: isFlexLayout ? 'flex' : 'block', flexDirection:'column', minHeight:0 }}>
+      <div data-scroll-container onScroll={isMd && !isEditing ? handleMdScroll : undefined} style={{ flex:1, overflow: isFlexLayout ? 'hidden' : 'auto', padding: isFlexLayout ? '0' : isMd ? '24px 32px' : '0', display: isFlexLayout ? 'flex' : 'block', flexDirection:'column', minHeight:0 }}>
         {selectedFile && (
           showDiff ? (
             diffError ? <div style={{ padding:'24px', color:'var(--error)', fontFamily:FONT_MONO, fontSize:'12px', whiteSpace:'pre-wrap' }}>Diff failed: {diffError}</div>
@@ -299,7 +350,8 @@ const FileViewer = ({
           ) : showPreviewPane ? (
             <MarkdownView content={editContent} isDark={isDark} fileDirPath={fileDirPath} />
           ) : isMd ? (
-            <MarkdownView content={content} isDark={isDark} fileDirPath={fileDirPath} />
+            <MarkdownView content={content} isDark={isDark} fileDirPath={fileDirPath}
+              searchQuery={searchOpen ? searchQuery : ''} currentMatchIdx={currentMatchIdx} onMatchesFound={setMdMatchCount} />
           ) : (
             <SyntaxHighlighter
               language={ext || 'text'}

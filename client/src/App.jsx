@@ -28,6 +28,7 @@ function App() {
   const handleEscapeKeyRef = useRef(null)
   const handleViewerKeyRef = useRef(null)
   const openSearchRef      = useRef(null)
+  const closeSearchRef     = useRef(null)
   const externallyChangedRef = useRef(false)
   const activeFocusRef     = useRef('explorer')
 
@@ -229,6 +230,7 @@ function App() {
   const handleUnsavedDiscard   = useCallback(() => executeAction(pendingAction), [pendingAction, executeAction])
 
   const handleEscapeKey = () => {
+    if (closeSearchRef.current?.()) return
     if (isEditingRef.current) { requireCleanRef.current({ type:'exitEdit' }); return }
     if (selectedFileRef.current) { requireCleanRef.current({ type:'close' }); return }
     handleFocusChange('explorer')
@@ -253,6 +255,8 @@ function App() {
 
   const handleViewerKey = (e) => {
     if (!selectedFileRef.current || isEditingRef.current) return false
+    const t = e.target
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return false
     const k = resolveKey(e.key)
     if (k === 'e') { e.preventDefault(); setDiffMode(false); setEditContent(fileContentRef.current); setIsEditing(true); return true }
     if (k === 'd' && selectedFileRef.current && gitInfo.filesByAbs.has(selectedFileRef.current.path)) { e.preventDefault(); setDiffMode(true); return true }
@@ -401,7 +405,7 @@ function App() {
         <div style={{ display:'flex', flex:1, overflow:'hidden', background:'var(--surface)' }}>
           {selectedFile ? (
             <div style={{ flex:1, minWidth:'40%', overflow:'hidden' }}>
-              <FileViewer innerRef={viewerRef} onFocus={focusViewer} onClose={closeViewer} onEnterEdit={enterEditMode} onExitEdit={exitEditMode} onSave={saveFile} onEditContentChange={setEditContent} selectedFile={selectedFile} content={fileContent} isEditing={isEditing} editContent={editContent} isDirty={isDirty} isMd={isMd} isDark={isDark} isFocused={activeFocus === 'viewer'} gitDirty={gitDirty} diffMode={diffMode} onEnterDiff={enterDiffMode} onExitDiff={exitDiffMode} externallyChanged={externallyChanged} onReload={reloadCurrentFile} openSearchRef={openSearchRef} />
+              <FileViewer innerRef={viewerRef} onFocus={focusViewer} onClose={closeViewer} onEnterEdit={enterEditMode} onExitEdit={exitEditMode} onSave={saveFile} onEditContentChange={setEditContent} selectedFile={selectedFile} content={fileContent} isEditing={isEditing} editContent={editContent} isDirty={isDirty} isMd={isMd} isDark={isDark} isFocused={activeFocus === 'viewer'} gitDirty={gitDirty} diffMode={diffMode} onEnterDiff={enterDiffMode} onExitDiff={exitDiffMode} externallyChanged={externallyChanged} onReload={reloadCurrentFile} openSearchRef={openSearchRef} closeSearchRef={closeSearchRef} />
             </div>
           ) : (
             <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
