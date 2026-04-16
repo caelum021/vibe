@@ -186,7 +186,7 @@ const FileViewer = ({
         <span style={{ fontSize:'13px', fontWeight:500, color: isDirty ? 'var(--accent)' : 'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', transition:'color 150ms' }}>
           {selectedFile?.name}{isDirty ? ' *' : ''}
         </span>
-        <span style={{ fontSize:'10px', color:'var(--muted)', background:'var(--surface-2)', border:'1px solid var(--border)', borderRadius:'3px', padding:'1px 6px', fontFamily:FONT_MONO, flexShrink:0 }}>{langBadge}</span>
+        <span style={{ fontSize:'10px', color:'var(--muted)', background:'var(--surface-2)', border:'1px solid var(--border)', borderRadius:'4px', padding:'1px 6px', fontFamily:FONT_MONO, flexShrink:0 }}>{langBadge}</span>
 
         {isEditing && isMd && (
           <div style={{ display:'flex' }}>
@@ -199,7 +199,7 @@ const FileViewer = ({
         )}
 
         {externallyChanged && (
-          <span onClick={onReload} title="Press L to reload" style={{ fontSize:'10px', color:'var(--warning, #b8860b)', background:'var(--warning-sub, #fdf6e3)', padding:'1px 6px', borderRadius:'3px', cursor:'pointer', flexShrink:0, fontFamily:FONT_UI }}>
+          <span onClick={onReload} title="Press L to reload" style={{ fontSize:'10px', color:'var(--warning, #b8860b)', background:'var(--warning-sub, #fdf6e3)', padding:'1px 6px', borderRadius:'4px', cursor:'pointer', flexShrink:0, fontFamily:FONT_UI }}>
             changed externally
           </span>
         )}
@@ -254,14 +254,14 @@ const FileViewer = ({
             }}
             placeholder="Search…"
             spellCheck={false}
-            style={{ flex:'0 1 240px', background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'3px', padding:'2px 8px', fontSize:'12px', fontFamily:FONT_MONO, color:'var(--text)', outline:'none' }}
+            style={{ flex:'0 1 240px', background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'4px', padding:'4px 8px', fontSize:'12px', fontFamily:FONT_MONO, color:'var(--text)', outline:'none' }}
           />
           <span style={{ fontSize:'11px', color:'var(--muted)', fontFamily:FONT_MONO, minWidth:'48px' }}>
             {searchQuery ? `${searchMatches.length > 0 ? currentMatchIdx + 1 : 0}/${searchMatches.length}` : ''}
           </span>
-          <button onClick={searchPrev} disabled={searchMatches.length === 0} style={{ background:'none', border:'none', color: searchMatches.length > 0 ? 'var(--text)' : 'var(--muted)', cursor:'pointer', fontSize:'14px', padding:'0 4px', lineHeight:1 }}>&#x25B2;</button>
-          <button onClick={searchNext} disabled={searchMatches.length === 0} style={{ background:'none', border:'none', color: searchMatches.length > 0 ? 'var(--text)' : 'var(--muted)', cursor:'pointer', fontSize:'14px', padding:'0 4px', lineHeight:1 }}>&#x25BC;</button>
-          <button onClick={closeSearch} style={{ background:'none', border:'none', color:'var(--muted)', cursor:'pointer', fontSize:'14px', padding:'0 4px', lineHeight:1 }}>&times;</button>
+          <button onClick={searchPrev} disabled={searchMatches.length === 0} style={{ background:'none', border:'none', color: searchMatches.length > 0 ? 'var(--text)' : 'var(--muted)', cursor:'pointer', fontSize:'12px', padding:'4px 6px', lineHeight:1 }}>&#x25B2;</button>
+          <button onClick={searchNext} disabled={searchMatches.length === 0} style={{ background:'none', border:'none', color: searchMatches.length > 0 ? 'var(--text)' : 'var(--muted)', cursor:'pointer', fontSize:'12px', padding:'4px 6px', lineHeight:1 }}>&#x25BC;</button>
+          <button onClick={closeSearch} style={{ background:'none', border:'none', color:'var(--muted)', cursor:'pointer', fontSize:'14px', padding:'4px 6px', lineHeight:1 }}>&times;</button>
         </div>
       )}
 

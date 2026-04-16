@@ -4,7 +4,7 @@ import { CODE_ROW_STYLE, CODE_ROW_LINENUM_STYLE, CODE_ROW_TOKEN_STYLE } from '..
 const CodeRow = ({ index, style, rows, stylesheet, useInlineStyles, searchMatchSet, currentMatchLine }) => {
   const isMatch = searchMatchSet?.has(index)
   const isCurrent = currentMatchLine === index
-  const bg = isCurrent ? 'var(--search-current, rgba(255,165,0,0.25))' : isMatch ? 'var(--search-match, rgba(255,213,0,0.12))' : undefined
+  const bg = isCurrent ? 'var(--search-current)' : isMatch ? 'var(--search-match)' : undefined
   return (
     <div style={{ ...style, ...CODE_ROW_STYLE, background: bg }}>
       <span style={CODE_ROW_LINENUM_STYLE}>{index + 1}</span>

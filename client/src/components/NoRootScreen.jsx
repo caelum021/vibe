@@ -29,7 +29,7 @@ function ProjectDropdown({ projects, currentPath, onSelect }) {
       </button>
       {open && (
         <div ref={menuRef}
-          style={{ position:'absolute', bottom:'calc(100% + 6px)', right:0, background:'var(--bg)', border:'1px solid var(--border)', borderRadius:'6px', padding:'4px 0', minWidth:'200px', boxShadow:'0 6px 20px rgba(0,0,0,0.18)', zIndex:100 }}>
+          style={{ position:'absolute', bottom:'calc(100% + 6px)', right:0, background:'var(--bg)', border:'1px solid var(--border)', borderRadius:'6px', padding:'4px 0', minWidth:'200px', boxShadow:'0 6px 20px rgba(26,22,18,0.15)', zIndex:100 }}>
           {projects.map((p, i) => {
             const active = p.path === currentPath
             return (
@@ -122,7 +122,7 @@ function NoRootScreen({ projects, onOpen, onPick, onProjectsChange }) {
   }
 
   return (
-    <div style={{ width:'100%', height:'100vh', background:'var(--bg)', display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:'20px' }}>
+    <div style={{ width:'100%', height:'100vh', background:'var(--bg)', display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:'24px' }}>
       <h1 style={{ fontFamily:FONT_SERIF, fontStyle:'italic', color:'var(--text)', fontSize:'32px', fontWeight:400, margin:0 }}>vibe</h1>
       <p style={{ color:'var(--muted)', fontSize:'14px', margin:0 }}>프로젝트 폴더를 선택하세요</p>
       <button onClick={onPick} style={{ background:'var(--accent-sub)', border:'1px solid var(--accent)', color:'var(--accent)', cursor:'pointer', padding:'10px 24px', borderRadius:'6px', fontSize:'14px', fontFamily:FONT_UI }}>폴더 열기…</button>
@@ -144,7 +144,7 @@ function NoRootScreen({ projects, onOpen, onPick, onProjectsChange }) {
                 onClick={() => { if (!dragRef.current) onOpen(p.path) }}
                 onMouseEnter={() => setHoverIdx(i)}
                 onMouseLeave={() => setHoverIdx(null)}
-                style={{ display:'flex', alignItems:'center', gap:'8px', padding:'6px 8px', borderRadius:'5px', cursor: isDragging ? 'grabbing' : 'pointer',
+                style={{ display:'flex', alignItems:'center', gap:'8px', padding:'6px 8px', borderRadius:'6px', cursor: isDragging ? 'grabbing' : 'pointer',
                          background: hoverIdx === i && !drag ? 'var(--surface-2)' : 'transparent',
                          opacity: isDragging ? 0.4 : 1,
                          borderTop:    showAbove ? '2px solid var(--accent)' : '2px solid transparent',
@@ -167,10 +167,10 @@ function NoRootScreen({ projects, onOpen, onPick, onProjectsChange }) {
       <p style={{ color:'var(--border)', fontSize:'12px', marginTop:'12px' }}>또는 CLI에서: <code style={{ color:'var(--muted)', fontFamily:FONT_MONO }}>vibe /path/to/project</code></p>
 
       {confirmDelete && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.35)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000 }}
+        <div style={{ position:'fixed', inset:0, background:'rgba(26,22,18,0.45)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000 }}
           onClick={() => setConfirmDelete(null)}>
           <div onClick={e => e.stopPropagation()}
-            style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'8px', padding:'24px 32px', textAlign:'center', minWidth:'280px', boxShadow:'0 8px 32px rgba(0,0,0,0.15)' }}>
+            style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'8px', padding:'24px 32px', textAlign:'center', minWidth:'280px', boxShadow:'0 8px 32px rgba(26,22,18,0.12)' }}>
             <p style={{ margin:'0 0 6px', color:'var(--text)', fontSize:'14px' }}>
               <span style={{ fontFamily:FONT_SERIF, fontStyle:'italic' }}>{basenameOf(confirmDelete)}</span>
             </p>

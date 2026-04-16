@@ -38,7 +38,7 @@ export default function ProjectDashboard({ data, recentChanges, onFileOpen, onRe
             <div style={{ fontFamily:FONT_MONO, fontSize:'11px', color:'var(--muted)', marginTop:'6px', display:'flex', alignItems:'center', gap:'8px' }}>
               <span style={{ color:'var(--text)' }}>⎇ {gitInfo.branch || '(detached)'}</span>
               {gitInfo.dirtyCount > 0 ? (
-                <span style={{ color:'var(--accent)' }}>● {gitInfo.dirtyCount} file{gitInfo.dirtyCount === 1 ? '' : 's'} changed</span>
+                <span style={{ color:'var(--accent)' }}>~ {gitInfo.dirtyCount} changed</span>
               ) : (
                 <span>clean</span>
               )}
@@ -51,7 +51,7 @@ export default function ProjectDashboard({ data, recentChanges, onFileOpen, onRe
           title="Refresh"
           onMouseEnter={e => { if (!refreshing) e.currentTarget.style.background = 'var(--surface-2)' }}
           onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
-          style={{ background:'transparent', border:'1px solid var(--border)', color:'var(--muted)', cursor: refreshing ? 'default' : 'pointer', padding:'6px', borderRadius:'5px', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, transition:'background 150ms ease-out' }}>
+          style={{ background:'transparent', border:'1px solid var(--border)', color:'var(--muted)', cursor: refreshing ? 'default' : 'pointer', padding:'6px', borderRadius:'6px', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, transition:'background 150ms ease-out' }}>
           {justRefreshed ? (
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="20 6 9 17 4 12"/>
@@ -124,7 +124,7 @@ export default function ProjectDashboard({ data, recentChanges, onFileOpen, onRe
                       draggable onDragStart={e => { e.dataTransfer.setData('text/plain', doc.path); e.dataTransfer.effectAllowed = 'copy' }}
                       onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent-sub)'; e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--accent) 20%, transparent)' }}
                       onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'transparent' }}
-                      style={{ display:'flex', alignItems:'center', gap:'8px', padding:'6px 8px', borderRadius:'5px', cursor:'pointer', border:'1px solid transparent', transition:'background 75ms' }}>
+                      style={{ display:'flex', alignItems:'center', gap:'8px', padding:'6px 8px', borderRadius:'6px', cursor:'pointer', border:'1px solid transparent', transition:'background 75ms, border-color 75ms' }}>
                       <span style={{ fontSize:'14px', width:'20px', textAlign:'center', flexShrink:0, color:'var(--muted)' }}>{icon}</span>
                       <div style={{ flex:1, minWidth:0 }}>
                         <div style={{ fontSize:'13px', fontWeight:500, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{doc.name}</div>
@@ -162,7 +162,7 @@ export default function ProjectDashboard({ data, recentChanges, onFileOpen, onRe
                   draggable onDragStart={e => { e.dataTransfer.setData('text/plain', item.path); e.dataTransfer.effectAllowed = 'copy' }}
                   onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-2)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                  style={{ display:'flex', alignItems:'center', gap:'8px', padding:'5px 8px', borderRadius:'5px', cursor:'pointer', transition:'background 75ms' }}>
+                  style={{ display:'flex', alignItems:'center', gap:'8px', padding:'5px 8px', borderRadius:'6px', cursor:'pointer', transition:'background 75ms' }}>
                   <span style={{ width:'6px', height:'6px', borderRadius:'50%', background:dotColor, flexShrink:0 }} />
                   <span style={{ fontSize:'13px', color:'var(--text)', flex:1 }}>{item.name}</span>
                   {badge && (

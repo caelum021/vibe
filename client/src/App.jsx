@@ -381,8 +381,8 @@ function App() {
     <div style={{ display:'flex', flexDirection:'column', width:'100%', height:'100vh', background:'var(--bg)', overflow:'hidden' }}>
 
       {pendingAction && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.35)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000 }}>
-          <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'8px', padding:'24px 32px', textAlign:'center', minWidth:'280px', boxShadow:'0 8px 32px rgba(0,0,0,0.15)' }}>
+        <div style={{ position:'fixed', inset:0, background:'rgba(26,22,18,0.45)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000 }}>
+          <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'8px', padding:'24px 32px', textAlign:'center', minWidth:'280px', boxShadow:'0 8px 32px rgba(26,22,18,0.12)' }}>
             <p style={{ marginBottom:'20px', color:'var(--text)', fontSize:'14px' }}>저장하지 않은 변경사항이 있습니다.</p>
             <div style={{ display:'flex', gap:'8px', justifyContent:'center' }}>
               <button onClick={handleUnsavedSave} style={{ background:'var(--accent-sub)', border:'1px solid var(--accent)', color:'var(--accent)', cursor:'pointer', padding:'6px 16px', borderRadius:'4px', fontSize:'13px', fontFamily:FONT_UI }}>저장</button>
@@ -394,7 +394,7 @@ function App() {
       )}
 
       <div style={{ display:'flex', flex:1, overflow:'hidden' }}>
-        <div style={{ width: sidebarVisible ? '240px' : '0px', opacity: sidebarVisible ? 1 : 0, visibility: sidebarVisible ? 'visible' : 'hidden', display:'flex', flexDirection:'column', flexShrink:0, borderRight: sidebarVisible ? '1px solid var(--border)' : 'none', background:'var(--bg)', overflow:'hidden', transition:'width 0.25s ease-in-out, opacity 0.2s ease-in-out', userSelect:'none', WebkitUserSelect:'none' }}>
+        <div style={{ width: sidebarVisible ? '220px' : '0px', opacity: sidebarVisible ? 1 : 0, visibility: sidebarVisible ? 'visible' : 'hidden', display:'flex', flexDirection:'column', flexShrink:0, borderRight: sidebarVisible ? '1px solid var(--border)' : 'none', background:'var(--bg)', overflow:'hidden', transition:'width 0.25s ease-in-out, opacity 0.2s ease-in-out', userSelect:'none', WebkitUserSelect:'none' }}>
           <FileExplorer key={rootPath} innerRef={explorerRef} onFocus={focusExplorer} onFileSelect={handleFileSelect} isFocused={activeFocus === 'explorer'} onAtRootChange={setExplorerAtRoot} refreshKey={refreshKey} activeFilePath={selectedFile?.path} changedFiles={changedFiles} gitFiles={gitInfo.filesByAbs} gitInfo={gitInfo} />
         </div>
 

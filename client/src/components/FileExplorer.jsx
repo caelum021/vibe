@@ -334,12 +334,12 @@ const FileExplorer = ({ onFileSelect, isFocused, onFocus, innerRef, onAtRootChan
                   onMouseLeave={() => setHoveredPath(null)}
                   style={{
                     display:'flex', alignItems:'center', gap:'10px',
-                    padding: `3px 16px 3px ${highlight ? padL - 2 : padL}px`,
+                    padding: `3px 16px 3px ${padL}px`,
                     cursor:'pointer', userSelect:'none', position:'relative',
                     whiteSpace:'nowrap', overflow:'hidden',
                     background: highlight ? 'var(--surface-2)' : 'transparent',
-                    borderLeft: highlight ? '2px solid color-mix(in srgb, var(--accent) 60%, var(--border))' : 'none',
-                    transition:'background 75ms',
+                    borderLeft: highlight ? '2px solid var(--accent)' : '2px solid transparent',
+                    transition:'background 75ms, border-color 75ms',
                   }}
                 >
                   {isActive && (
