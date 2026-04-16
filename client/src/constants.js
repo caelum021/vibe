@@ -39,11 +39,11 @@ export const EXT_TO_LANG = { js:'JavaScript', jsx:'JSX', ts:'TypeScript', tsx:'T
 export const LANG_COLORS = { JSX:'#E8703A', JavaScript:'#F0C945', TypeScript:'#3178C6', TSX:'#61DAFB', Rust:'#9C4221', Python:'#3572A5', CSS:'#563D7C', HTML:'#E34C26', JSON:'#A0A0A0', TOML:'#9C4221', Markdown:'#5D8FBD', Shell:'#89E051', Other:'#8C8070' }
 
 // ── Footer shortcut arrays ────────────────────────────────────────────────────
-export const SHORTCUTS_VIEWER_VIEW       = [['E','Edit'], ['Space','Scroll'], ['Ctrl+B','Sidebar'], ['Esc','Close']]
-export const SHORTCUTS_VIEWER_VIEW_DIRTY = [['E','Edit'], ['D','Diff'], ['Space','Scroll'], ['Ctrl+B','Sidebar'], ['Esc','Close']]
+export const SHORTCUTS_VIEWER_VIEW       = [['E','Edit'], ['Space','Scroll'], ['Ctrl+F','Search'], ['Ctrl+B','Sidebar'], ['Esc','Close']]
+export const SHORTCUTS_VIEWER_VIEW_DIRTY = [['E','Edit'], ['D','Diff'], ['Space','Scroll'], ['Ctrl+F','Search'], ['Ctrl+B','Sidebar'], ['Esc','Close']]
 export const SHORTCUTS_VIEWER_DIFF       = [['V','View'], ['Esc','Close']]
-export const SHORTCUTS_VIEWER_EDIT       = [['Tab','Indent'], ['Ctrl+S','Save'], ['Esc','Exit edit']]
-export const SHORTCUTS_VIEWER_EDIT_MD    = [['Tab','Indent'], ['Ctrl+P','Edit/Preview'], ['Ctrl+S','Save'], ['Esc','Exit edit']]
+export const SHORTCUTS_VIEWER_EDIT       = [['Tab','Indent'], ['Ctrl+W','Wrap'], ['Ctrl+S','Save'], ['Esc','Exit edit']]
+export const SHORTCUTS_VIEWER_EDIT_MD    = [['Tab','Indent'], ['Ctrl+P','Edit/Preview'], ['Ctrl+W','Wrap'], ['Ctrl+S','Save'], ['Esc','Exit edit']]
 export const SHORTCUTS_EXPLORER          = [['↑↓','Navigate'], ['A','New'], ['R','Rename'], ['D','Delete'], ['C','Copy'], ['Ctrl+R','Refresh'], ['Ctrl+B','Sidebar'], ['Enter','Open']]
 
 // ── Git badges ────────────────────────────────────────────────────────────────

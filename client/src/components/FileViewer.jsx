@@ -14,14 +14,21 @@ const FileViewer = ({
   onEditContentChange, onEnterEdit, onExitEdit, onSave,
   isFocused, onFocus, onClose, innerRef,
   gitDirty, diffMode, onEnterDiff, onExitDiff,
-  externallyChanged, onReload,
+  externallyChanged, onReload, openSearchRef,
 }) => {
   const [mdTab, setMdTab] = useState('edit')
   const [diffData, setDiffData] = useState(null)
   const [diffError, setDiffError] = useState('')
   const [diffSideBySide, setDiffSideBySide] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [currentMatchIdx, setCurrentMatchIdx] = useState(0)
+  const [copied, setCopied] = useState(false)
+  const [wrapEnabled, setWrapEnabled] = useState(false)
   const textareaRef       = useRef(null)
   const lineNumbersRef    = useRef(null)
+  const searchInputRef    = useRef(null)
+  const listRef           = useRef(null)
   const ext = selectedFile?.name.split('.').pop()?.toLowerCase() ?? ''
   const langBadge = EXT_TO_DISPLAY[ext] || ext || '—'
 
@@ -29,7 +36,66 @@ const FileViewer = ({
     if (lineNumbersRef.current) lineNumbersRef.current.scrollTop = e.currentTarget.scrollTop
   }, [])
 
-  useEffect(() => { setMdTab('edit'); setDiffData(null); setDiffError(''); setDiffSideBySide(false) }, [selectedFile])
+  // Search matches (line indices) computed from content
+  const searchMatches = useMemo(() => {
+    if (!searchQuery || !content) return []
+    const q = searchQuery.toLowerCase()
+    const lines = content.split('\n')
+    const matches = []
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].toLowerCase().includes(q)) matches.push(i)
+    }
+    return matches
+  }, [searchQuery, content])
+
+  // Clamp currentMatchIdx when matches change
+  useEffect(() => {
+    if (searchMatches.length === 0) setCurrentMatchIdx(0)
+    else if (currentMatchIdx >= searchMatches.length) setCurrentMatchIdx(0)
+  }, [searchMatches.length])
+
+  // Scroll to current match
+  useEffect(() => {
+    if (searchMatches.length > 0 && listRef.current) {
+      listRef.current.scrollToRow({ index: searchMatches[currentMatchIdx], align: 'center' })
+    }
+  }, [currentMatchIdx, searchMatches])
+
+  const searchNext = useCallback(() => {
+    if (searchMatches.length === 0) return
+    setCurrentMatchIdx(i => (i + 1) % searchMatches.length)
+  }, [searchMatches])
+
+  const searchPrev = useCallback(() => {
+    if (searchMatches.length === 0) return
+    setCurrentMatchIdx(i => (i - 1 + searchMatches.length) % searchMatches.length)
+  }, [searchMatches])
+
+  const openSearch = useCallback(() => {
+    setSearchOpen(true)
+    setTimeout(() => searchInputRef.current?.focus(), 0)
+  }, [])
+
+  // Expose openSearch to parent via ref
+  useEffect(() => {
+    if (openSearchRef) openSearchRef.current = openSearch
+  }, [openSearchRef, openSearch])
+
+  const closeSearch = useCallback(() => {
+    setSearchOpen(false)
+    setSearchQuery('')
+    setCurrentMatchIdx(0)
+  }, [])
+
+  const copyAll = useCallback(() => {
+    if (!content) return
+    navigator.clipboard.writeText(content).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    })
+  }, [content])
+
+  useEffect(() => { setMdTab('edit'); setDiffData(null); setDiffError(''); setDiffSideBySide(false); closeSearch() }, [selectedFile])
   useEffect(() => { if (isEditing && textareaRef.current) textareaRef.current.focus() }, [isEditing])
 
   // Fetch diff when entering diff mode (or when file re-changes while already in diff).
@@ -72,6 +138,7 @@ const FileViewer = ({
       onEditContentChange(editContent.slice(0, s) + '  ' + editContent.slice(end))
       requestAnimationFrame(() => { if (textareaRef.current) { textareaRef.current.selectionStart = s + 2; textareaRef.current.selectionEnd = s + 2 } })
     } else if (e.ctrlKey && resolveKey(e.key) === 's') { e.preventDefault(); onSave() }
+    else if (e.ctrlKey && resolveKey(e.key) === 'w') { e.preventDefault(); setWrapEnabled(w => !w) }
     else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); onExitEdit() }
   }, [editContent, onEditContentChange, onSave, onExitEdit])
 
@@ -97,16 +164,20 @@ const FileViewer = ({
     if (lineNumbersRef.current) lineNumbersRef.current.scrollTop = 0
   }, [selectedFile, isEditing])
 
+  const searchMatchSet = useMemo(() => new Set(searchMatches), [searchMatches])
+  const currentMatchLine = searchMatches.length > 0 ? searchMatches[currentMatchIdx] : -1
+
   const codeRenderer = useCallback(({ rows, stylesheet, useInlineStyles }) => (
     <VirtualList
+      listRef={listRef}
       rowCount={rows.length}
       rowHeight={LINE_HEIGHT_PX}
-      rowProps={{ rows, stylesheet, useInlineStyles }}
+      rowProps={{ rows, stylesheet, useInlineStyles, searchMatchSet, currentMatchLine }}
       rowComponent={CodeRow}
       overscanCount={5}
       style={{ overflowX: 'auto' }}
     />
-  ), [])
+  ), [searchMatchSet, currentMatchLine])
 
   return (
     <div ref={innerRef} tabIndex={0} onFocus={onFocus} style={{ display:'flex', flexDirection:'column', height:'100%', outline:'none', background:'var(--surface)' }}>
@@ -149,6 +220,10 @@ const FileViewer = ({
             </>
           ) : (
             <>
+              <button onClick={copyAll} title="Copy all"
+                onMouseEnter={e => { e.currentTarget.style.background='var(--surface-2)'; e.currentTarget.style.borderColor='var(--accent)'; e.currentTarget.style.color='var(--text)' }}
+                onMouseLeave={e => { e.currentTarget.style.background='none'; e.currentTarget.style.borderColor='var(--border)'; e.currentTarget.style.color='var(--muted)' }}
+                style={{ background:'none', border:'1px solid var(--border)', color: copied ? 'var(--accent)' : 'var(--muted)', cursor:'pointer', fontSize:'11px', padding:'2px 8px', borderRadius:'4px', fontFamily:FONT_UI, transition:'all 150ms' }}>{copied ? 'Copied' : 'Copy'}</button>
               {gitDirty && (
                 <button onClick={onEnterDiff} title="D Diff"
                   onMouseEnter={e => { e.currentTarget.style.background='var(--surface-2)'; e.currentTarget.style.borderColor='var(--accent)'; e.currentTarget.style.color='var(--text)' }}
@@ -165,6 +240,30 @@ const FileViewer = ({
           <button onClick={onClose} style={{ background:'transparent', border:'none', color:'var(--muted)', cursor:'pointer', fontSize:'16px', lineHeight:1, padding:'0 2px' }}>&times;</button>
         </div>
       </div>
+
+      {/* Search bar */}
+      {searchOpen && isCodeView && (
+        <div style={{ height:'32px', minHeight:'32px', borderBottom:'1px solid var(--border)', display:'flex', alignItems:'center', padding:'0 16px', gap:'8px', flexShrink:0, background:'var(--surface-2)' }}>
+          <input
+            ref={searchInputRef}
+            value={searchQuery}
+            onChange={e => { setSearchQuery(e.target.value); setCurrentMatchIdx(0) }}
+            onKeyDown={e => {
+              if (e.key === 'Enter') { e.preventDefault(); e.shiftKey ? searchPrev() : searchNext() }
+              else if (e.key === 'Escape') { e.preventDefault(); closeSearch() }
+            }}
+            placeholder="Search…"
+            spellCheck={false}
+            style={{ flex:'0 1 240px', background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'3px', padding:'2px 8px', fontSize:'12px', fontFamily:FONT_MONO, color:'var(--text)', outline:'none' }}
+          />
+          <span style={{ fontSize:'11px', color:'var(--muted)', fontFamily:FONT_MONO, minWidth:'48px' }}>
+            {searchQuery ? `${searchMatches.length > 0 ? currentMatchIdx + 1 : 0}/${searchMatches.length}` : ''}
+          </span>
+          <button onClick={searchPrev} disabled={searchMatches.length === 0} style={{ background:'none', border:'none', color: searchMatches.length > 0 ? 'var(--text)' : 'var(--muted)', cursor:'pointer', fontSize:'14px', padding:'0 4px', lineHeight:1 }}>&#x25B2;</button>
+          <button onClick={searchNext} disabled={searchMatches.length === 0} style={{ background:'none', border:'none', color: searchMatches.length > 0 ? 'var(--text)' : 'var(--muted)', cursor:'pointer', fontSize:'14px', padding:'0 4px', lineHeight:1 }}>&#x25BC;</button>
+          <button onClick={closeSearch} style={{ background:'none', border:'none', color:'var(--muted)', cursor:'pointer', fontSize:'14px', padding:'0 4px', lineHeight:1 }}>&times;</button>
+        </div>
+      )}
 
       {/* Content — code viewer & edit pane fill via flex; markdown flows in scroll container. */}
       <div data-scroll-container style={{ flex:1, overflow: isFlexLayout ? 'hidden' : 'auto', padding: isFlexLayout ? '0' : isMd ? '24px 32px' : '0', display: isFlexLayout ? 'flex' : 'block', flexDirection:'column', minHeight:0 }}>
@@ -194,8 +293,8 @@ const FileViewer = ({
               <textarea ref={textareaRef} value={editContent} onChange={e => onEditContentChange(e.target.value)} onKeyDown={handleTextareaKeyDown}
                 onScroll={handleTextareaScroll}
                 spellCheck={false}
-                wrap="off"
-                style={{ flex:1, background:'var(--surface)', color:'var(--text)', border:'none', outline:'none', resize:'none', padding:`${EDIT_PADDING_PX}px`, fontFamily:FONT_MONO, fontSize:'12.5px', lineHeight:`${LINE_HEIGHT_PX}px`, letterSpacing:'0.01em', whiteSpace:'pre' }} />
+                wrap={wrapEnabled ? 'soft' : 'off'}
+                style={{ flex:1, background:'var(--surface)', color:'var(--text)', border:'none', outline:'none', resize:'none', padding:`${EDIT_PADDING_PX}px`, fontFamily:FONT_MONO, fontSize:'12.5px', lineHeight:`${LINE_HEIGHT_PX}px`, letterSpacing:'0.01em', whiteSpace: wrapEnabled ? 'pre-wrap' : 'pre', wordBreak: wrapEnabled ? 'break-all' : undefined }} />
             </div>
           ) : showPreviewPane ? (
             <MarkdownView content={editContent} isDark={isDark} fileDirPath={fileDirPath} />
