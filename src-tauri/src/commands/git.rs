@@ -82,6 +82,9 @@ pub fn git_status(state: State<AppState>) -> Result<GitStatus, AppError> {
     let mut files = HashMap::with_capacity(statuses.len());
     for entry in statuses.iter() {
         if let (Some(path), Some(state)) = (entry.path(), classify(entry.status())) {
+            if repo.is_path_ignored(path).unwrap_or(false) {
+                continue;
+            }
             files.insert(path.to_string(), state.to_string());
         }
     }

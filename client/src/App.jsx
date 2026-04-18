@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
+import { getVersion } from '@tauri-apps/api/app'
 import * as api from './api'
 import FileExplorer from './components/FileExplorer'
 import FileViewer from './components/FileViewer'
@@ -51,12 +52,14 @@ function extractDesc(content) {
 
 // ── About modal ───────────────────────────────────────────────────────────────
 function AboutModal({ onClose }) {
+  const [version, setVersion] = useState('')
+  useEffect(() => { getVersion().then(setVersion) }, [])
   return (
     <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000 }}>
       <div onClick={e => e.stopPropagation()} style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'12px', padding:'36px 40px', width:'320px', display:'flex', flexDirection:'column', gap:'16px', boxShadow:'0 16px 48px rgba(0,0,0,0.2)' }}>
         <div>
           <div style={{ fontFamily:FONT_SERIF, fontStyle:'italic', fontSize:'28px', fontWeight:400, color:'var(--text)', lineHeight:1.1 }}>vibe</div>
-          <div style={{ fontFamily:FONT_MONO, fontSize:'11px', color:'var(--muted)', marginTop:'4px' }}>v1.0.1</div>
+          <div style={{ fontFamily:FONT_MONO, fontSize:'11px', color:'var(--muted)', marginTop:'4px' }}>{version ? `v${version}` : ''}</div>
         </div>
         <div style={{ fontSize:'13px', color:'var(--muted)', lineHeight:1.6 }}>
           코드베이스를 위한 옵시디언.<br />
