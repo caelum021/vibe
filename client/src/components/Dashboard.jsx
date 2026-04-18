@@ -1,9 +1,12 @@
-import { useState, useCallback } from 'react'
-import { FONT_MONO, FONT_SERIF, SECTION_LABEL, DIVIDER, EXT_TO_LANG, LANG_COLORS, formatAge, getDocIcon, gitBadgeFor } from '../constants'
+import { useState, useCallback, useMemo } from 'react'
+import { FONT_MONO, FONT_SERIF, SECTION_LABEL, DIVIDER, EXT_TO_LANG, LANG_COLORS, formatAge, getDocIcon, gitBadgeFor, gitStateLabel } from '../constants'
 
 const COLLAPSED_KEY = 'vibe-dashboard-collapsed'
+const PINNED_KEY    = 'vibe-dashboard-pinned'
 function loadCollapsed() { try { return new Set(JSON.parse(localStorage.getItem(COLLAPSED_KEY))) } catch { return new Set() } }
 function saveCollapsed(set) { localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...set])) }
+function loadPinned()    { try { return new Set(JSON.parse(localStorage.getItem(PINNED_KEY)))    } catch { return new Set() } }
+function savePinned(set) { localStorage.setItem(PINNED_KEY,    JSON.stringify([...set])) }
 
 function StatCard({ value, label }) {
   return (
@@ -14,11 +17,45 @@ function StatCard({ value, label }) {
   )
 }
 
+function DocItem({ doc, gitInfo, isPinned, onTogglePin, onFileOpen }) {
+  const [hovered, setHovered] = useState(false)
+  const icon = getDocIcon(doc.name)
+  const gitState = gitInfo?.filesByAbs?.get(doc.path)
+  const badge = gitBadgeFor(gitState)
+  return (
+    <div
+      onClick={() => onFileOpen(doc)}
+      draggable onDragStart={e => { e.dataTransfer.setData('text/plain', doc.path); e.dataTransfer.effectAllowed = 'copy' }}
+      onMouseEnter={e => { setHovered(true); e.currentTarget.style.background = 'var(--accent-sub)'; e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--accent) 20%, transparent)' }}
+      onMouseLeave={e => { setHovered(false); e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'transparent' }}
+      style={{ display:'flex', alignItems:'center', gap:'8px', padding:'6px 8px', borderRadius:'6px', cursor:'pointer', border:'1px solid transparent', transition:'background 75ms, border-color 75ms' }}>
+      <span style={{ fontSize:'14px', width:'20px', textAlign:'center', flexShrink:0, color:'var(--muted)' }}>{icon}</span>
+      <div style={{ flex:1, minWidth:0 }}>
+        <div style={{ fontSize:'13px', fontWeight:500, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{doc.name}</div>
+        {doc.desc && <div style={{ fontSize:'11px', color:'var(--muted)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{doc.desc}</div>}
+      </div>
+      {(hovered || isPinned) && (
+        <button
+          onClick={e => { e.stopPropagation(); onTogglePin(doc.path) }}
+          title={isPinned ? 'Unpin' : 'Pin'}
+          style={{ background:'none', border:'none', cursor:'pointer', padding:'0 2px', color: isPinned ? '#E8B84B' : 'var(--muted)', fontSize:'11px', flexShrink:0, lineHeight:1, opacity: isPinned ? 1 : 0.5 }}>
+          {isPinned ? '◆' : '◇'}
+        </button>
+      )}
+      {badge && (
+        <span title={gitStateLabel(gitState)} style={{ fontFamily:FONT_MONO, fontSize:'12px', color:badge.color, flexShrink:0, width:'12px', textAlign:'center', lineHeight:1 }}>{badge.glyph}</span>
+      )}
+      {doc.lineCount > 0 && (
+        <span style={{ fontFamily:FONT_MONO, fontSize:'10px', color:'var(--muted)', flexShrink:0 }}>{doc.lineCount} lines</span>
+      )}
+    </div>
+  )
+}
+
 export default function ProjectDashboard({ data, recentChanges, onFileOpen, onRefresh, refreshing, justRefreshed, gitInfo }) {
-  if (!data) return <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100%', color:'var(--muted)', fontSize:'13px' }}>Loading…</div>
-  const { projectName, projectPath, totalFiles, totalFolders, langStats, docGroups } = data
-  const totalDocs = docGroups.reduce((sum, g) => sum + g.items.length, 0)
   const [collapsed, setCollapsed] = useState(loadCollapsed)
+  const [pinned, setPinned] = useState(loadPinned)
+
   const toggleGroup = useCallback((groupName) => {
     setCollapsed(prev => {
       const next = new Set(prev)
@@ -27,6 +64,23 @@ export default function ProjectDashboard({ data, recentChanges, onFileOpen, onRe
       return next
     })
   }, [])
+
+  const togglePin = useCallback((path) => {
+    setPinned(prev => {
+      const next = new Set(prev)
+      next.has(path) ? next.delete(path) : next.add(path)
+      savePinned(next)
+      return next
+    })
+  }, [])
+
+  const docGroups = data?.docGroups
+  const allDocs    = useMemo(() => docGroups?.flatMap(g => g.items) ?? [], [docGroups])
+  const pinnedDocs = useMemo(() => allDocs.filter(d => pinned.has(d.path)), [allDocs, pinned])
+
+  if (!data) return <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100%', color:'var(--muted)', fontSize:'13px' }}>Loading…</div>
+  const { projectName, projectPath, totalFiles, totalFolders, langStats } = data
+  const totalDocs = allDocs.length
 
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', overflowY:'auto', padding:'32px 48px', gap:'32px', userSelect:'text', WebkitUserSelect:'text' }}>
@@ -100,47 +154,33 @@ export default function ProjectDashboard({ data, recentChanges, onFileOpen, onRe
         <div>
           <div style={SECTION_LABEL}>Documents</div>
           <div style={{ display:'flex', flexDirection:'column', gap:'4px' }}>
+            {pinnedDocs.map(doc => (
+              <DocItem key={doc.path} doc={doc} gitInfo={gitInfo} isPinned={true} onTogglePin={togglePin} onFileOpen={onFileOpen} />
+            ))}
+            {pinnedDocs.length > 0 && <div style={{ height:'1px', background:'var(--border)', margin:'4px 0 8px' }} />}
             {docGroups.map((group, gi) => {
               const groupKey = group.group || `__root_${gi}`
               const isCollapsed = collapsed.has(groupKey)
+              const unpinnedItems = group.items.filter(d => !pinned.has(d.path))
+              if (unpinnedItems.length === 0 && group.group) return null
               return (
-              <div key={gi} style={{ marginBottom: group.group ? '8px' : 0 }}>
-                {group.group && (
-                  <div onClick={() => toggleGroup(groupKey)}
-                    onMouseEnter={e => e.currentTarget.style.color = 'var(--text)'}
-                    onMouseLeave={e => e.currentTarget.style.color = 'var(--muted)'}
-                    style={{ fontFamily:FONT_SERIF, fontStyle:'italic', fontSize:'12px', color:'var(--muted)', marginBottom:'4px', paddingLeft:'4px', cursor:'pointer', display:'flex', alignItems:'center', gap:'6px', transition:'color 100ms' }}>
-                    <span style={{ fontSize:'8px', opacity:0.4, display:'inline-block', transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0)', transition:'transform 150ms' }}>▼</span>
-                    {group.group}
-                    {isCollapsed && <span style={{ fontSize:'10px', fontFamily:FONT_MONO, fontStyle:'normal' }}>({group.items.length})</span>}
-                  </div>
-                )}
-                {!isCollapsed && group.items.map(doc => {
-                  const icon = getDocIcon(doc.name)
-                  const gitState = gitInfo?.filesByAbs?.get(doc.path)
-                  const badge = gitBadgeFor(gitState)
-                  return (
-                    <div key={doc.path} onClick={() => onFileOpen(doc)}
-                      draggable onDragStart={e => { e.dataTransfer.setData('text/plain', doc.path); e.dataTransfer.effectAllowed = 'copy' }}
-                      onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent-sub)'; e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--accent) 20%, transparent)' }}
-                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'transparent' }}
-                      style={{ display:'flex', alignItems:'center', gap:'8px', padding:'6px 8px', borderRadius:'6px', cursor:'pointer', border:'1px solid transparent', transition:'background 75ms, border-color 75ms' }}>
-                      <span style={{ fontSize:'14px', width:'20px', textAlign:'center', flexShrink:0, color:'var(--muted)' }}>{icon}</span>
-                      <div style={{ flex:1, minWidth:0 }}>
-                        <div style={{ fontSize:'13px', fontWeight:500, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{doc.name}</div>
-                        {doc.desc && <div style={{ fontSize:'11px', color:'var(--muted)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{doc.desc}</div>}
-                      </div>
-                      {badge && (
-                        <span title={gitState} style={{ fontFamily:FONT_MONO, fontSize:'12px', color:badge.color, flexShrink:0, width:'12px', textAlign:'center', lineHeight:1 }}>{badge.glyph}</span>
-                      )}
-                      {doc.lineCount > 0 && (
-                        <span style={{ fontFamily:FONT_MONO, fontSize:'10px', color:'var(--muted)', flexShrink:0 }}>{doc.lineCount} lines</span>
-                      )}
+                <div key={gi} style={{ marginBottom: group.group ? '8px' : 0 }}>
+                  {group.group && (
+                    <div onClick={() => toggleGroup(groupKey)}
+                      onMouseEnter={e => e.currentTarget.style.color = 'var(--text)'}
+                      onMouseLeave={e => e.currentTarget.style.color = 'var(--muted)'}
+                      style={{ fontFamily:FONT_SERIF, fontStyle:'italic', fontSize:'12px', color:'var(--muted)', marginBottom:'4px', paddingLeft:'4px', cursor:'pointer', display:'flex', alignItems:'center', gap:'6px', transition:'color 100ms' }}>
+                      <span style={{ fontSize:'8px', opacity:0.4, display:'inline-block', transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0)', transition:'transform 150ms' }}>▼</span>
+                      {group.group}
+                      {isCollapsed && <span style={{ fontSize:'10px', fontFamily:FONT_MONO, fontStyle:'normal' }}>({unpinnedItems.length})</span>}
                     </div>
-                  )
-                })}
-              </div>
-            )})}
+                  )}
+                  {!isCollapsed && unpinnedItems.map(doc => (
+                    <DocItem key={doc.path} doc={doc} gitInfo={gitInfo} isPinned={false} onTogglePin={togglePin} onFileOpen={onFileOpen} />
+                  ))}
+                </div>
+              )
+            })}
           </div>
         </div>
       )}
@@ -158,19 +198,20 @@ export default function ProjectDashboard({ data, recentChanges, onFileOpen, onRe
                 const gitState = gitInfo?.filesByAbs?.get(item.path)
                 const badge = gitBadgeFor(gitState)
                 return (
-                <div key={item.path + i} onClick={() => onFileOpen(item)}
-                  draggable onDragStart={e => { e.dataTransfer.setData('text/plain', item.path); e.dataTransfer.effectAllowed = 'copy' }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-2)'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                  style={{ display:'flex', alignItems:'center', gap:'8px', padding:'5px 8px', borderRadius:'6px', cursor:'pointer', transition:'background 75ms' }}>
-                  <span style={{ width:'6px', height:'6px', borderRadius:'50%', background:dotColor, flexShrink:0 }} />
-                  <span style={{ fontSize:'13px', color:'var(--text)', flex:1 }}>{item.name}</span>
-                  {badge && (
-                    <span title={gitState} style={{ fontFamily:FONT_MONO, fontSize:'12px', color:badge.color, flexShrink:0, width:'12px', textAlign:'center', lineHeight:1 }}>{badge.glyph}</span>
-                  )}
-                  <span style={{ fontFamily:FONT_MONO, fontSize:'10px', color:'var(--muted)' }}>{formatAge(item.time)}</span>
-                  {item.lineCount > 0 && <span style={{ fontFamily:FONT_MONO, fontSize:'10px', color:'var(--muted)', minWidth:'52px', textAlign:'right' }}>{item.lineCount} lines</span>}
-                </div>)
+                  <div key={item.path + i} onClick={() => onFileOpen(item)}
+                    draggable onDragStart={e => { e.dataTransfer.setData('text/plain', item.path); e.dataTransfer.effectAllowed = 'copy' }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-2)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                    style={{ display:'flex', alignItems:'center', gap:'8px', padding:'5px 8px', borderRadius:'6px', cursor:'pointer', transition:'background 75ms' }}>
+                    <span style={{ width:'6px', height:'6px', borderRadius:'50%', background:dotColor, flexShrink:0 }} />
+                    <span style={{ fontSize:'13px', color:'var(--text)', flex:1 }}>{item.name}</span>
+                    {badge && (
+                      <span title={gitStateLabel(gitState)} style={{ fontFamily:FONT_MONO, fontSize:'12px', color:badge.color, flexShrink:0, width:'12px', textAlign:'center', lineHeight:1 }}>{badge.glyph}</span>
+                    )}
+                    <span style={{ fontFamily:FONT_MONO, fontSize:'10px', color:'var(--muted)' }}>{formatAge(item.time)}</span>
+                    {item.lineCount > 0 && <span style={{ fontFamily:FONT_MONO, fontSize:'10px', color:'var(--muted)', minWidth:'52px', textAlign:'right' }}>{item.lineCount} lines</span>}
+                  </div>
+                )
               })}
             </div>
           </div>

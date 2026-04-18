@@ -38,7 +38,14 @@ On macOS, open the DMG and drag the app to your Applications folder.
 
 **Git diff** — See which files changed with status badges. View diffs inline or side-by-side.
 
-**Project dashboard** — Language breakdown, document groups, and recently changed files at a glance.
+**Project dashboard** — When you open a project, vibe greets you with a dashboard instead of a blank editor. See your codebase at a glance:
+
+- **Project stats** — file count, folder count, language breakdown
+- **Documents** — markdown docs in your project root and `docs/` subdirectories, auto-grouped and listed
+- **Recently Changed** — last 5 modified files, so you can immediately see what your AI CLI just touched
+- **Git status** — current branch and working tree state
+
+This is especially useful when returning to a project after an AI session — you can quickly orient yourself without digging through the file tree.
 
 **Multiple projects** — Register projects and switch between them with Cmd+1–9.
 

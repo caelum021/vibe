@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import * as api from '../api'
-import { resolveKey, getIcon, getIndent, gitBadgeFor, GIT_BADGE_TOUCHED, FONT_MONO, FONT_SERIF, FONT_UI } from '../constants'
+import { resolveKey, getIcon, getIndent, gitBadgeFor, gitStateLabel, GIT_STATE_RANK, FONT_MONO, FONT_SERIF, FONT_UI } from '../constants'
 
 const FileExplorer = ({ onFileSelect, isFocused, onFocus, innerRef, onAtRootChange, refreshKey, activeFilePath, changedFiles, gitFiles, gitInfo }) => {
   const [rootItems, setRootItems]           = useState([])
@@ -72,24 +72,28 @@ const FileExplorer = ({ onFileSelect, isFocused, onFocus, innerRef, onAtRootChan
     if (idx >= 0) setSelectedIndex(idx)
   }, [activeFilePath, visibleItems])
 
-  // Bubble up: set of directory abs paths that contain at least one dirty file.
+  // Bubble up: map of directory abs paths → 'new'|'changed' (changed wins over new).
   const dirtyDirs = useMemo(() => {
-    const set = new Set()
+    const map = new Map()  // path → git state (highest priority wins)
     const root = rootPathRef.current
-    if (!gitFiles || gitFiles.size === 0) return set
-    for (const absPath of gitFiles.keys()) {
+    if (!gitFiles || gitFiles.size === 0) return map
+    for (const [absPath, state] of gitFiles.entries()) {
       let cur = absPath
       const lastSlash = cur.lastIndexOf('/')
       if (lastSlash < 0) continue
       cur = cur.slice(0, lastSlash)
-      while (cur && cur !== root && !set.has(cur)) {
-        set.add(cur)
+      while (cur && cur !== root) {
+        const prev = map.get(cur)
+        const prevPri = prev !== undefined ? (GIT_STATE_RANK[prev] ?? Infinity) : Infinity
+        const curPri  = GIT_STATE_RANK[state] ?? Infinity
+        if (curPri < prevPri) map.set(cur, state)
+        else if (prevPri === 0) break  // already at highest priority (deleted)
         const s = cur.lastIndexOf('/')
         if (s < 0) break
         cur = cur.slice(0, s)
       }
     }
-    return set
+    return map
   }, [gitFiles])
 
   // Fetch root
@@ -368,14 +372,15 @@ const FileExplorer = ({ onFileSelect, isFocused, onFocus, innerRef, onAtRootChan
                     let badge = null
                     let title = ''
                     if (item.isDirectory) {
-                      if (!isExpanded && dirtyDirs?.has(item.path)) {
-                        badge = GIT_BADGE_TOUCHED
+                      const dirState = !isExpanded ? dirtyDirs?.get(item.path) : undefined
+                      if (dirState) {
+                        badge = gitBadgeFor(dirState)
                         title = 'contains changes'
                       }
                     } else {
                       const gitState = gitFiles?.get(item.path)
                       badge = gitBadgeFor(gitState)
-                      title = gitState || ''
+                      title = gitStateLabel(gitState)
                     }
                     if (!badge) return null
                     return (

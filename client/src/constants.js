@@ -47,13 +47,20 @@ export const SHORTCUTS_VIEWER_EDIT_MD    = [['Tab','Indent'], ['Ctrl+P','Edit/Pr
 export const SHORTCUTS_EXPLORER          = [['↑↓','Navigate'], ['A','New'], ['R','Rename'], ['D','Delete'], ['C','Copy'], ['Ctrl+R','Refresh'], ['Ctrl+B','Sidebar'], ['Enter','Open']]
 
 // ── Git badges ────────────────────────────────────────────────────────────────
-export const GIT_BADGE_TOUCHED = { glyph: '●', color: 'var(--accent)' }
-const GIT_BADGE_DELETED = { glyph: '●', color: 'var(--muted)' }
-export const gitBadgeFor = (state) => {
-  if (!state) return null
-  if (state === 'deleted') return GIT_BADGE_DELETED
-  return GIT_BADGE_TOUCHED
+// 5 states with distinct colors. Folder bubble-up priority: deleted > modified > renamed > added > untracked
+const GIT_BADGES = {
+  added:     { glyph: '●', color: 'var(--success)' },   // green   — staged new file
+  untracked: { glyph: '●', color: '#4DA8A4' },           // teal    — new, not staged
+  modified:  { glyph: '●', color: 'var(--warning)' },   // orange  — changed
+  deleted:   { glyph: '●', color: 'var(--error)' },     // red     — gone
+  renamed:   { glyph: '●', color: '#7B9FD4' },           // steel blue — neutral transform
 }
+export const GIT_STATE_PRIORITY = ['deleted', 'modified', 'renamed', 'added', 'untracked']
+export const GIT_STATE_RANK = Object.fromEntries(GIT_STATE_PRIORITY.map((s, i) => [s, i]))
+export const isNewFile = (state) => state === 'added' || state === 'untracked'
+export const gitBadgeFor = (state) => GIT_BADGES[state] ?? null
+const GIT_STATE_LABELS = { added: 'new file', untracked: 'untracked', modified: 'modified', deleted: 'deleted', renamed: 'renamed' }
+export const gitStateLabel = (state) => GIT_STATE_LABELS[state] ?? state ?? ''
 
 // ── Misc helpers ─────────────────────────────────────────────────────────────
 export const formatReadError = (err) => {

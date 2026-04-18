@@ -6,13 +6,92 @@ import FileViewer from './components/FileViewer'
 import ProjectDashboard from './components/Dashboard'
 import NoRootScreen, { ProjectDropdown } from './components/NoRootScreen'
 import {
-  resolveKey, formatReadError, FONT_MONO, FONT_UI,
+  resolveKey, formatReadError, FONT_MONO, FONT_SERIF, FONT_UI,
   DOC_EXTENSIONS, DOC_FOLDERS, EXT_TO_LANG, LANG_COLORS,
   RECENT_CHANGES_LIMIT, isHiddenFile, basenameOf, makeRecentEntry,
   loadProjects, addProject,
   SHORTCUTS_VIEWER_VIEW, SHORTCUTS_VIEWER_VIEW_DIRTY, SHORTCUTS_VIEWER_DIFF,
   SHORTCUTS_VIEWER_EDIT, SHORTCUTS_VIEWER_EDIT_MD, SHORTCUTS_EXPLORER,
 } from './constants'
+
+// ── Doc description extraction ───────────────────────────────────────────────
+function stripMd(text) {
+  return text
+    .replace(/!\[[^\]]*\]\([^)]+\)/g, '')        // images
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')     // [text](url)
+    .replace(/\*\*([^*]+)\*\*/g, '$1')           // bold
+    .replace(/\*([^*]+)\*/g, '$1')               // italic
+    .replace(/`([^`]+)`/g, '$1')                 // inline code
+    .replace(/^>\s*/, '')                         // blockquote prefix
+    .replace(/^[-*+]\s+/, '')                    // list prefix
+    .trim()
+}
+
+function extractDesc(content) {
+  const lines = content.split('\n')
+  let i = 0
+  // Skip frontmatter block
+  if (lines[0]?.trim() === '---') {
+    i = 1
+    while (i < lines.length && lines[i]?.trim() !== '---') i++
+    i++
+  }
+  let afterH1 = false
+  let fallback = ''
+  for (; i < lines.length; i++) {
+    const t = lines[i].trim()
+    if (!t || t.startsWith('<!--')) continue
+    if (t.startsWith('# ')) { afterH1 = true; continue }
+    if (t.startsWith('#')) continue
+    if (afterH1) return stripMd(t)
+    if (!fallback) fallback = t
+  }
+  return stripMd(fallback)
+}
+
+// ── About modal ───────────────────────────────────────────────────────────────
+function AboutModal({ onClose }) {
+  return (
+    <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000 }}>
+      <div onClick={e => e.stopPropagation()} style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'12px', padding:'36px 40px', width:'320px', display:'flex', flexDirection:'column', gap:'16px', boxShadow:'0 16px 48px rgba(0,0,0,0.2)' }}>
+        <div>
+          <div style={{ fontFamily:FONT_SERIF, fontStyle:'italic', fontSize:'28px', fontWeight:400, color:'var(--text)', lineHeight:1.1 }}>vibe</div>
+          <div style={{ fontFamily:FONT_MONO, fontSize:'11px', color:'var(--muted)', marginTop:'4px' }}>v1.0.1</div>
+        </div>
+        <div style={{ fontSize:'13px', color:'var(--muted)', lineHeight:1.6 }}>
+          코드베이스를 위한 옵시디언.<br />
+          AI CLI와 함께 쓰는 문서 편집기.
+        </div>
+        <div style={{ height:'1px', background:'var(--border)' }} />
+        <div style={{ fontSize:'11px', color:'var(--muted)', lineHeight:2 }}>
+          <div style={{ fontWeight:500, marginBottom:'4px', textTransform:'uppercase', letterSpacing:'0.08em', fontSize:'10px' }}>Git badges</div>
+          <div style={{ display:'flex', flexDirection:'column', gap:'2px' }}>
+            {[['var(--success)','added'],['#4DA8A4','untracked'],['var(--warning)','modified'],['var(--error)','deleted'],['#7B9FD4','renamed']].map(([color, label]) => (
+              <div key={label} style={{ display:'flex', alignItems:'center', gap:'8px' }}>
+                <span style={{ fontFamily:FONT_MONO, fontSize:'12px', color, flexShrink:0 }}>●</span>
+                <span>{label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div style={{ height:'1px', background:'var(--border)' }} />
+        <div style={{ fontFamily:FONT_MONO, fontSize:'11px', color:'var(--muted)', lineHeight:1.8 }}>
+          Tauri v2 · Rust · React + Vite
+        </div>
+        <a href="https://github.com/solpop-arch/vibe" target="_blank" rel="noreferrer"
+          style={{ fontFamily:FONT_MONO, fontSize:'11px', color:'var(--accent)', textDecoration:'none' }}>
+          github.com/solpop-arch/vibe ↗
+        </a>
+        <button onClick={onClose}
+          onMouseEnter={e => { e.currentTarget.style.background='var(--surface-2)' }}
+          onMouseLeave={e => { e.currentTarget.style.background='none' }}
+          style={{ background:'none', border:'1px solid var(--border)', color:'var(--muted)', borderRadius:'6px', padding:'6px', fontSize:'12px', cursor:'pointer', transition:'background 150ms', marginTop:'4px' }}>
+          Close
+        </button>
+      </div>
+    </div>
+  )
+}
 
 // ── App ───────────────────────────────────────────────────────────────────────
 function App() {
@@ -45,6 +124,7 @@ function App() {
   const [explorerAtRoot, setExplorerAtRoot]     = useState(true)
   const [refreshKey, setRefreshKey]             = useState(0)
   const [theme, setTheme]                       = useState(() => localStorage.getItem('vibe-theme') || 'light')
+  const [aboutOpen, setAboutOpen]               = useState(false)
   const [rootPath, setRootPath]                 = useState('')
   const [changedFiles, setChangedFiles]         = useState(new Set())
   const [recentChanges, setRecentChanges]       = useState([])
@@ -145,14 +225,7 @@ function App() {
           const d = await api.readFile(doc.path)
           const content = d.content || ''
           const lines = content.split('\n').length
-          let desc = ''
-          for (const line of content.split('\n')) {
-            const trimmed = line.trim()
-            if (!trimmed || trimmed.startsWith('# ')) continue
-            if (trimmed.startsWith('## ')) { desc = trimmed.replace(/^#+\s*/, ''); break }
-            if (trimmed.startsWith('- **') || trimmed.startsWith('**')) { desc = trimmed.replace(/\*\*/g, '').replace(/^-\s*/, ''); break }
-            if (trimmed.length > 5 && !trimmed.startsWith('#') && !trimmed.startsWith('<!--') && !trimmed.startsWith('---')) { desc = trimmed; break }
-          }
+          let desc = extractDesc(content)
           if (desc.length > 60) desc = desc.slice(0, 57) + '...'
           return { ...doc, lineCount: lines, desc }
         } catch (_) { return { ...doc, lineCount: 0, desc: '' } }
@@ -230,6 +303,7 @@ function App() {
   const handleUnsavedDiscard   = useCallback(() => executeAction(pendingAction), [pendingAction, executeAction])
 
   const handleEscapeKey = () => {
+    if (aboutOpen) { setAboutOpen(false); return }
     if (closeSearchRef.current?.()) return
     if (isEditingRef.current) { requireCleanRef.current({ type:'exitEdit' }); return }
     if (selectedFileRef.current) { requireCleanRef.current({ type:'close' }); return }
@@ -351,6 +425,7 @@ function App() {
         const idx = parseInt(key) - 1
         if (idx < projects.length && projects[idx].path !== rootPath) { e.preventDefault(); switchProject(projects[idx].path) }
       }
+      else if (e.key === '?' && !e.target?.matches('input,textarea,[contenteditable]')) { e.preventDefault(); setAboutOpen(a => !a) }
       else if (e.key === 'Escape') { e.preventDefault(); handleEscapeKeyRef.current() }
       else if (e.ctrlKey && key === 'r') { e.preventDefault(); refreshAll() }
       else if (e.ctrlKey && key === 'f' && activeFocusRef.current === 'viewer' && selectedFileRef.current && !isEditingRef.current) { e.preventDefault(); openSearchRef.current?.() }
@@ -383,6 +458,8 @@ function App() {
 
   return (
     <div style={{ display:'flex', flexDirection:'column', width:'100%', height:'100vh', background:'var(--bg)', overflow:'hidden' }}>
+
+      {aboutOpen && <AboutModal onClose={() => setAboutOpen(false)} />}
 
       {pendingAction && (
         <div style={{ position:'fixed', inset:0, background:'rgba(26,22,18,0.45)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000 }}>
@@ -437,6 +514,12 @@ function App() {
             onMouseLeave={e => { e.currentTarget.style.background='none'; e.currentTarget.style.color='var(--muted)' }}
             style={{ background:'none', border:'1px solid var(--border)', color:'var(--muted)', borderRadius:'4px', padding:'2px 8px', fontSize:'10px', cursor:'pointer', fontFamily:FONT_UI, transition:'all 150ms' }}>
             {isDark ? 'Light' : 'Dark'}
+          </button>
+          <button onClick={() => setAboutOpen(true)}
+            onMouseEnter={e => { e.currentTarget.style.color='var(--text)' }}
+            onMouseLeave={e => { e.currentTarget.style.color='var(--muted)' }}
+            style={{ background:'none', border:'none', color:'var(--muted)', padding:'1px 4px', fontSize:'12px', cursor:'pointer', transition:'color 150ms' }}>
+            ?
           </button>
         </div>
       </div>
