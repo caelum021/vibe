@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/nicovank/tauri-v2-schema/refs/heads/main/tauri.conf.json",
   "productName": "vibe",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "identifier": "com.vibe.app",
   "build": {
     "frontendDist": "../client/dist",

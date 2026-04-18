@@ -1,26 +1,45 @@
 # Changelog
 
-## [1.0.1] - 2026-04-10
-
-### Fixed
-- 대시보드 데이터 정확성 + 자동/수동 갱신
-- 편집 모드 외부 변경 감지 (ref 기반 직접 비교)
-- 편집 모드 줄번호 스크롤 동기화
+## [1.0.2] - 2026-04-18
 
 ### Added
-- Space/Shift+Space 페이지 스크롤
-- 타이틀바 프로젝트명 표시
-- 드래그/복사 절대경로
-- 대시보드 문서 그룹 접기/펼치기
+- In-viewer search (Ctrl+F) — code and markdown, with highlight and navigation
+- Copy All button — copies full file content to clipboard (works with virtualized viewer)
+- Word wrap toggle in edit mode (Ctrl+W)
+- Dashboard document pinning — pin frequently used docs to the top
+- About modal (`?` key) — app version and git badge color legend
+- 5-color git badges — distinct colors for added/untracked/modified/deleted/renamed
+- Document description extraction — shows first paragraph preview in dashboard
+
+### Fixed
+- Gitignored files incorrectly showing git badges in the explorer
+- About modal version hardcoded to 1.0.1 — now reads dynamically from Tauri API
+- Scroll position reset when switching from view mode to edit mode
+
+### Changed
+- Design system alignment (sidebar 220px, border-radius, warm black shadows)
+
+## [1.0.1] - 2026-04-10
+
+### Added
+- Space/Shift+Space page scroll in viewer
+- Project name in title bar
+- Absolute path drag and copy
+- Collapsible document groups in dashboard
+
+### Fixed
+- Dashboard data accuracy and auto/manual refresh
+- External file change detection in edit mode (ref-based comparison)
+- Line number scroll sync in edit mode
 
 ## [1.0.0] - 2026-04-09
 
 ### Added
-- 파일 탐색 (트리, 키보드 네비게이션, 생성/삭제/이름변경)
-- 마크다운 렌더링 뷰어 + 편집 + 프리뷰 토글
-- 코드 구문 강조 뷰어 (react-window 가상화)
-- Git diff (inline/side-by-side) + 파일별 상태 배지 + 자동 갱신
-- 프로젝트 대시보드 (언어 분포, 문서 목록, 최근 변경)
-- 멀티 프로젝트 전환 (Cmd+1-9)
-- 파일 감시 + 자동 갱신
-- GitHub Actions CI/CD (태그 푸시 → 자동 빌드/배포)
+- File explorer (tree, keyboard navigation, create/delete/rename)
+- Markdown viewer with edit and preview toggle
+- Code viewer with syntax highlighting (react-window virtualization)
+- Git diff (inline/side-by-side) + per-file status badges + auto-refresh
+- Project dashboard (language breakdown, document list, recently changed)
+- Multi-project switching (Cmd+1-9)
+- File watching + auto-refresh
+- GitHub Actions CI/CD (tag push → automated build and release)
