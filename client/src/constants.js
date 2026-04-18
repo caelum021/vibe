@@ -118,8 +118,8 @@ export const addProject = (path) => {
   const list = loadProjects()
   if (list.some(p => p.path === path)) return list
   const name = basenameOf(path)
-  list.unshift({ path, name })
-  if (list.length > 10) list.length = 10
+  list.push({ path, name })
+  if (list.length > 10) list.shift()
   saveProjects(list)
   return list
 }
