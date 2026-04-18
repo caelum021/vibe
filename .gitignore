@@ -41,4 +41,5 @@ target/
 # Markdown
 *.md
 !README*.md
+!CHANGELOG.md
 .gstack/
