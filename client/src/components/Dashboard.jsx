@@ -76,7 +76,6 @@ export default function ProjectDashboard({ data, recentChanges, onFileOpen, onRe
 
   const docGroups = data?.docGroups
   const allDocs    = useMemo(() => docGroups?.flatMap(g => g.items) ?? [], [docGroups])
-  const pinnedDocs = useMemo(() => allDocs.filter(d => pinned.has(d.path)), [allDocs, pinned])
 
   if (!data) return <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100%', color:'var(--muted)', fontSize:'13px' }}>Loading…</div>
   const { projectName, projectPath, totalFiles, totalFolders, langStats } = data
@@ -154,15 +153,15 @@ export default function ProjectDashboard({ data, recentChanges, onFileOpen, onRe
         <div>
           <div style={SECTION_LABEL}>Documents</div>
           <div style={{ display:'flex', flexDirection:'column', gap:'4px' }}>
-            {pinnedDocs.map(doc => (
-              <DocItem key={doc.path} doc={doc} gitInfo={gitInfo} isPinned={true} onTogglePin={togglePin} onFileOpen={onFileOpen} />
-            ))}
-            {pinnedDocs.length > 0 && <div style={{ height:'1px', background:'var(--border)', margin:'4px 0 8px' }} />}
             {docGroups.map((group, gi) => {
               const groupKey = group.group || `__root_${gi}`
               const isCollapsed = collapsed.has(groupKey)
-              const unpinnedItems = group.items.filter(d => !pinned.has(d.path))
-              if (unpinnedItems.length === 0 && group.group) return null
+              const sortedItems = [...group.items].sort((a, b) => {
+                const ap = pinned.has(a.path) ? 0 : 1
+                const bp = pinned.has(b.path) ? 0 : 1
+                return ap - bp
+              })
+              if (sortedItems.length === 0 && group.group) return null
               return (
                 <div key={gi} style={{ marginBottom: group.group ? '8px' : 0 }}>
                   {group.group && (
@@ -172,11 +171,11 @@ export default function ProjectDashboard({ data, recentChanges, onFileOpen, onRe
                       style={{ fontFamily:FONT_SERIF, fontStyle:'italic', fontSize:'12px', color:'var(--muted)', marginBottom:'4px', paddingLeft:'4px', cursor:'pointer', display:'flex', alignItems:'center', gap:'6px', transition:'color 100ms' }}>
                       <span style={{ fontSize:'8px', opacity:0.4, display:'inline-block', transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0)', transition:'transform 150ms' }}>▼</span>
                       {group.group}
-                      {isCollapsed && <span style={{ fontSize:'10px', fontFamily:FONT_MONO, fontStyle:'normal' }}>({unpinnedItems.length})</span>}
+                      {isCollapsed && <span style={{ fontSize:'10px', fontFamily:FONT_MONO, fontStyle:'normal' }}>({sortedItems.length})</span>}
                     </div>
                   )}
-                  {!isCollapsed && unpinnedItems.map(doc => (
-                    <DocItem key={doc.path} doc={doc} gitInfo={gitInfo} isPinned={false} onTogglePin={togglePin} onFileOpen={onFileOpen} />
+                  {!isCollapsed && sortedItems.map(doc => (
+                    <DocItem key={doc.path} doc={doc} gitInfo={gitInfo} isPinned={pinned.has(doc.path)} onTogglePin={togglePin} onFileOpen={onFileOpen} />
                   ))}
                 </div>
               )
