@@ -45,17 +45,33 @@ function transformLineOutsideInlineCode(line) {
   return out
 }
 
-function MarkdownImage({ src, alt, fileDirPath }) {
+function BrokenImagePlaceholder({ src }) {
+  return (
+    <div style={{
+      display:'inline-flex', alignItems:'center', gap:'10px',
+      padding:'10px 14px', margin:'8px 0',
+      border:'1.5px dashed var(--error)', borderRadius:'4px',
+      color:'var(--error)', fontSize:'12px', fontFamily:FONT_MONO,
+      background:'color-mix(in srgb, var(--error) 6%, transparent)',
+    }}>
+      <span aria-hidden="true" style={{ fontSize:'14px' }}>⊘</span>
+      <span>image missing: {src}</span>
+    </div>
+  )
+}
+
+function MarkdownImage({ src, alt, fileDirPath, forcedBroken }) {
   const [dataUrl, setDataUrl] = useState(null)
   useEffect(() => {
-    if (!src) return
+    if (!src || forcedBroken) return
     if (src.startsWith('data:') || src.startsWith('http:') || src.startsWith('https:')) {
       setDataUrl(src)
       return
     }
     const absPath = src.startsWith('/') ? src : fileDirPath + '/' + src
     api.readImage(absPath).then(r => setDataUrl(r.dataUrl)).catch(() => setDataUrl(null))
-  }, [src, fileDirPath])
+  }, [src, fileDirPath, forcedBroken])
+  if (forcedBroken) return <BrokenImagePlaceholder src={src} />
   if (!dataUrl) return <span style={{ color:'var(--muted)', fontSize:'12px' }}>[image: {alt || src}]</span>
   return <img src={dataUrl} alt={alt || ''} style={{ maxWidth:'100%', borderRadius:'4px', margin:'8px 0' }} />
 }
@@ -114,9 +130,21 @@ function ExternalLink({ url, children }) {
   )
 }
 
-function makeMarkdownComponents(isDark, fileDirPath, rootPath, onLinkOpen) {
+function BrokenLink({ href, children }) {
+  return (
+    <a href={href}
+       onClick={(e) => e.preventDefault()}
+       title={`Broken link: ${href}`}
+       style={{ color:'var(--error)', textDecoration:'underline dotted 1.5px', textUnderlineOffset:'3px', cursor:'help' }}>
+      {children}
+    </a>
+  )
+}
+
+function makeMarkdownComponents(isDark, fileDirPath, rootPath, onLinkOpen, brokenHrefs) {
   const border = '1px solid var(--border)'
   const hl = isDark ? vscDarkPlus : oneLight
+  const isBroken = (href) => !!href && brokenHrefs && brokenHrefs.has(href)
   return {
     h1: ({children}) => <h1 style={{ fontFamily:FONT_SERIF, fontStyle:'italic', fontSize:'26px', fontWeight:400, color:'var(--text)', borderBottom:border, paddingBottom:'8px', marginBottom:'16px', marginTop:'32px' }}>{children}</h1>,
     h2: ({children}) => <h2 style={{ fontSize:'16px', fontWeight:600, color:'var(--text)', borderBottom:border, paddingBottom:'4px', marginTop:'32px', marginBottom:'8px' }}>{children}</h2>,
@@ -129,6 +157,7 @@ function makeMarkdownComponents(isDark, fileDirPath, rootPath, onLinkOpen) {
         : <code style={{ background:'var(--surface-2)', padding:'1px 5px', borderRadius:'3px', color:'var(--accent)', fontSize:'11.5px', fontFamily:FONT_MONO, letterSpacing:'0.01em' }}>{children}</code>
     },
     a: ({href, children}) => {
+      if (isBroken(href)) return <BrokenLink href={href}>{children}</BrokenLink>
       const c = classifyHref(href)
       if (c.kind === 'external') return <ExternalLink url={c.url}>{children}</ExternalLink>
       if (c.kind === 'internal') return <InternalLink href={c.rel} fileDirPath={fileDirPath} rootPath={rootPath} onLinkOpen={onLinkOpen}>{children}</InternalLink>
@@ -146,12 +175,12 @@ function makeMarkdownComponents(isDark, fileDirPath, rootPath, onLinkOpen) {
     th: ({children}) => <th style={{ padding:'5px 8px', textAlign:'left', fontWeight:600 }}>{children}</th>,
     td: ({children}) => <td style={{ padding:'5px 8px', borderBottom:'1px solid var(--border)' }}>{children}</td>,
     tr: ({children}) => <tr>{children}</tr>,
-    img: ({src, alt}) => <MarkdownImage src={src} alt={alt} fileDirPath={fileDirPath} />,
+    img: ({src, alt}) => <MarkdownImage src={src} alt={alt} fileDirPath={fileDirPath} forcedBroken={isBroken(src)} />,
   }
 }
 
-export default function MarkdownView({ content, isDark, fileDirPath, rootPath, onLinkOpen, searchQuery = '', currentMatchIdx = 0, onMatchesFound }) {
-  const components = useMemo(() => makeMarkdownComponents(isDark, fileDirPath, rootPath, onLinkOpen), [isDark, fileDirPath, rootPath, onLinkOpen])
+export default function MarkdownView({ content, isDark, fileDirPath, rootPath, onLinkOpen, brokenHrefs, searchQuery = '', currentMatchIdx = 0, onMatchesFound }) {
+  const components = useMemo(() => makeMarkdownComponents(isDark, fileDirPath, rootPath, onLinkOpen, brokenHrefs), [isDark, fileDirPath, rootPath, onLinkOpen, brokenHrefs])
   const processedContent = useMemo(() => preprocessKoreanBold(content), [content])
   const containerRef = useRef(null)
   const currentMarkRef = useRef(null)

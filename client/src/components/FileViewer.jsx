@@ -40,6 +40,28 @@ const FileViewer = ({
   }, [])
 
   const [mdMatchCount, setMdMatchCount] = useState(0)
+  const [brokenHrefs, setBrokenHrefs] = useState(null)
+
+  useEffect(() => {
+    if (!selectedFile?.path || !isMd) { setBrokenHrefs(null); return }
+    let cancelled = false
+    const load = () => {
+      api.getOutgoingLinks(selectedFile.path).then(list => {
+        if (cancelled) return
+        const set = new Set()
+        for (const l of list || []) {
+          if (!l.isExternal && l.target === null && l.rawHref) set.add(l.rawHref)
+        }
+        setBrokenHrefs(set)
+      }).catch(() => { if (!cancelled) setBrokenHrefs(null) })
+    }
+    load()
+    const unlistenPromises = [api.onLinkIndexReady(load), api.onFileChanged(load)]
+    return () => {
+      cancelled = true
+      unlistenPromises.forEach(p => p.then(fn => fn && fn()).catch(() => {}))
+    }
+  }, [selectedFile?.path, isMd])
 
   const searchMatches = useMemo(() => {
     if (!searchQuery || !content || isMd) return []
@@ -350,10 +372,10 @@ const FileViewer = ({
                 style={{ flex:1, background:'var(--surface)', color:'var(--text)', border:'none', outline:'none', resize:'none', padding:`${EDIT_PADDING_PX}px`, fontFamily:FONT_MONO, fontSize:'12.5px', lineHeight:`${LINE_HEIGHT_PX}px`, letterSpacing:'0.01em', whiteSpace: wrapEnabled ? 'pre-wrap' : 'pre', wordBreak: wrapEnabled ? 'break-all' : undefined }} />
             </div>
           ) : showPreviewPane ? (
-            <MarkdownView content={editContent} isDark={isDark} fileDirPath={fileDirPath} rootPath={rootPath} onLinkOpen={onLinkOpen} />
+            <MarkdownView content={editContent} isDark={isDark} fileDirPath={fileDirPath} rootPath={rootPath} onLinkOpen={onLinkOpen} brokenHrefs={brokenHrefs} />
           ) : isMd ? (
             <>
-              <MarkdownView content={content} isDark={isDark} fileDirPath={fileDirPath} rootPath={rootPath} onLinkOpen={onLinkOpen}
+              <MarkdownView content={content} isDark={isDark} fileDirPath={fileDirPath} rootPath={rootPath} onLinkOpen={onLinkOpen} brokenHrefs={brokenHrefs}
                 searchQuery={searchOpen ? searchQuery : ''} currentMatchIdx={currentMatchIdx} onMatchesFound={setMdMatchCount} />
               <BacklinksPanel path={selectedFile?.path} rootPath={rootPath} onLinkOpen={onLinkOpen} />
             </>

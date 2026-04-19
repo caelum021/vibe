@@ -132,6 +132,8 @@ function App() {
   const [changedFiles, setChangedFiles]         = useState(new Set())
   const [recentChanges, setRecentChanges]       = useState([])
   const [dashboardData, setDashboardData]       = useState(null)
+  const [brokenLinks, setBrokenLinks]           = useState([])
+  const [orphanDocs, setOrphanDocs]             = useState([])
   const [projects, setProjects]                 = useState(() => loadProjects())
   const [gitInfo, setGitInfo]                   = useState({ isRepo: false, branch: null, filesByAbs: new Map(), dirtyCount: 0 })
   const [refreshing, setRefreshing]             = useState(false)
@@ -255,6 +257,14 @@ function App() {
     } catch (e) { console.error('Dashboard load failed:', e) }
   }, [])
 
+  const loadLinkHealth = useCallback(async () => {
+    try {
+      const [broken, orphans] = await Promise.all([api.getBrokenLinks(), api.getOrphanDocs()])
+      setBrokenLinks(broken || [])
+      setOrphanDocs(orphans || [])
+    } catch (e) { console.error('Link health load failed:', e) }
+  }, [])
+
   const handleFocusChange = useCallback((target) => {
     setActiveFocus(target)
     setTimeout(() => {
@@ -319,9 +329,9 @@ function App() {
     setRefreshing(true)
     setJustRefreshed(false)
     const minSpin = new Promise(r => setTimeout(r, 650))
-    try { await Promise.all([loadDashboard(), loadGitStatus(rootPathRef.current), minSpin]) }
+    try { await Promise.all([loadDashboard(), loadGitStatus(rootPathRef.current), loadLinkHealth(), minSpin]) }
     finally { setRefreshing(false); setJustRefreshed(true); setTimeout(() => setJustRefreshed(false), 900) }
-  }, [loadDashboard, loadGitStatus])
+  }, [loadDashboard, loadGitStatus, loadLinkHealth])
 
   const reloadCurrentFile = useCallback(() => {
     if (!selectedFileRef.current) return
@@ -361,6 +371,7 @@ function App() {
     setSelectedFile(null); setFileContent(''); setIsEditing(false); setEditContent('')
     setChangedFiles(new Set()); setRecentChanges([])
     setDashboardData(null)
+    setBrokenLinks([]); setOrphanDocs([])
     setGitInfo({ isRepo: false, branch: null, filesByAbs: new Map(), dirtyCount: 0 })
     setRootPath(path)
     getCurrentWindow().setTitle(`vibe. — ${basenameOf(path)}`)
@@ -376,7 +387,13 @@ function App() {
       setRootReady(!!r); setRootPath(r || '')
     }).catch(() => setRootReady(false))
   }, [])
-  useEffect(() => { if (rootReady) { loadDashboard(); loadGitStatus(rootPath) } }, [rootReady, loadDashboard, loadGitStatus, rootPath])
+  useEffect(() => { if (rootReady) { loadDashboard(); loadGitStatus(rootPath); loadLinkHealth() } }, [rootReady, loadDashboard, loadGitStatus, loadLinkHealth, rootPath])
+
+  useEffect(() => {
+    const ref = { current: null }; let unmounted = false
+    api.onLinkIndexReady(() => { loadLinkHealth() }).then(fn => { if (unmounted) fn(); else ref.current = fn })
+    return () => { unmounted = true; ref.current?.() }
+  }, [loadLinkHealth])
 
   useEffect(() => {
     const ref = { current: null }; let unmounted = false
@@ -403,7 +420,7 @@ function App() {
         }
         // Debounced dashboard refresh on file changes
         if (dashboardRefetchTimerRef.current) clearTimeout(dashboardRefetchTimerRef.current)
-        dashboardRefetchTimerRef.current = setTimeout(() => loadDashboard(), 2000)
+        dashboardRefetchTimerRef.current = setTimeout(() => { loadDashboard(); loadLinkHealth() }, 2000)
         // External change detection for the currently viewed file
         if (selectedFileRef.current && paths.includes(selectedFileRef.current.path)) {
           if (isEditingRef.current) {
@@ -489,7 +506,7 @@ function App() {
             </div>
           ) : (
             <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-              <ProjectDashboard data={dashboardData} recentChanges={recentChanges} onFileOpen={handleFileSelect} onRefresh={refreshAll} refreshing={refreshing} justRefreshed={justRefreshed} gitInfo={gitInfo} />
+              <ProjectDashboard data={dashboardData} recentChanges={recentChanges} brokenLinks={brokenLinks} orphanDocs={orphanDocs} onFileOpen={handleFileSelect} onRefresh={refreshAll} refreshing={refreshing} justRefreshed={justRefreshed} gitInfo={gitInfo} />
             </div>
           )}
         </div>

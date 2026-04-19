@@ -176,6 +176,10 @@ Claude(warm cream/coral) 계열과의 시각적 분리 및 브랜드 명료화�
   - `renamed` → `#7B9FD4` 청회색
   - 접힌 폴더는 bubble-up. 우선순위: deleted > modified > renamed > added > untracked
 - **File-changed pulse:** accent-sub 배경 + 4px 도트, 2s ease-in-out 펄스. 인지만 시키고 방해하지 않음.
+- **Broken / Invalid Links:** 존재하지 않는 내부 링크·이미지를 가리키는 마크다운 엘리먼트.
+  - 인라인 링크: `var(--error)` 색 + `text-decoration: underline dotted 1.5px`, `cursor: help`, `title="Broken link: <href>"` 네이티브 툴팁. 클릭은 `preventDefault` — 이동 없음.
+  - 이미지 placeholder: `1.5px dashed var(--error)` 박스 + `⊘` 글리프 + `image missing: <src>` 라벨. 모노폰트.
+  - 외부 URL(http/https/mailto/tel)과 앵커(`#section`)는 broken 판정 대상 아님 — 오프라인 원칙상 외부 검증 없음.
 - **공통 기조:** "something happened"를 알리되 alarming하지 않게. 협업 도구답게 차분하게.
 
 ## Motion

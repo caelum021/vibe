@@ -52,7 +52,68 @@ function DocItem({ doc, gitInfo, isPinned, onTogglePin, onFileOpen }) {
   )
 }
 
-export default function ProjectDashboard({ data, recentChanges, onFileOpen, onRefresh, refreshing, justRefreshed, gitInfo }) {
+function relPathFrom(abs, root) {
+  if (!abs) return ''
+  if (root && abs.startsWith(root + '/')) return abs.slice(root.length + 1)
+  return abs
+}
+
+function BrokenLinksSection({ items, onFileOpen, rootPath }) {
+  if (!items || items.length === 0) return null
+  return (
+    <>
+      <hr style={DIVIDER} />
+      <div>
+        <div style={SECTION_LABEL}>Broken Links ({items.length})</div>
+        <div style={{ display:'flex', flexDirection:'column', gap:'2px', maxHeight:'260px', overflowY:'auto' }}>
+          {items.map((b, i) => (
+            <div
+              key={`${b.source}:${b.line}:${i}`}
+              onClick={() => onFileOpen({ path: b.source, name: b.source.split('/').pop(), isDirectory: false })}
+              onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-2)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+              style={{ padding:'6px 8px', borderRadius:'6px', cursor:'pointer', transition:'background 75ms', borderLeft:'2px solid var(--error)' }}>
+              <div style={{ display:'flex', alignItems:'center', gap:'6px' }}>
+                <span style={{ fontFamily:FONT_MONO, fontSize:'11.5px', color:'var(--accent)' }}>{relPathFrom(b.source, rootPath)}</span>
+                <span style={{ fontFamily:FONT_MONO, fontSize:'11px', color:'var(--muted)' }}>:{b.line}</span>
+                <span style={{ fontSize:'10px', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'0.05em' }}>{b.kind}</span>
+              </div>
+              <div style={{ fontFamily:FONT_MONO, fontSize:'11.5px', color:'var(--error)', marginTop:'2px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                → {b.rawHref}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
+  )
+}
+
+function OrphanDocsSection({ paths, onFileOpen, rootPath }) {
+  if (!paths || paths.length === 0) return null
+  return (
+    <>
+      <hr style={DIVIDER} />
+      <div>
+        <div style={SECTION_LABEL}>Orphan Docs ({paths.length})</div>
+        <div style={{ display:'flex', flexDirection:'column', gap:'2px', maxHeight:'220px', overflowY:'auto' }}>
+          {paths.map((p) => (
+            <div
+              key={p}
+              onClick={() => onFileOpen({ path: p, name: p.split('/').pop(), isDirectory: false })}
+              onMouseEnter={e => { e.currentTarget.style.background = 'var(--surface-2)'; e.currentTarget.style.color = 'var(--accent)' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--muted)' }}
+              style={{ fontFamily:FONT_MONO, fontSize:'12px', color:'var(--muted)', padding:'5px 8px', borderRadius:'6px', cursor:'pointer', transition:'background 75ms, color 75ms', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+              {relPathFrom(p, rootPath)}
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
+  )
+}
+
+export default function ProjectDashboard({ data, recentChanges, brokenLinks, orphanDocs, onFileOpen, onRefresh, refreshing, justRefreshed, gitInfo }) {
   const [collapsed, setCollapsed] = useState(loadCollapsed)
   const [pinned, setPinned] = useState(loadPinned)
 
@@ -184,6 +245,8 @@ export default function ProjectDashboard({ data, recentChanges, onFileOpen, onRe
         </div>
       )}
 
+      <BrokenLinksSection items={brokenLinks} onFileOpen={onFileOpen} rootPath={data.projectPath} />
+
       {recentChanges.length > 0 && (
         <>
           <hr style={DIVIDER} />
@@ -216,6 +279,8 @@ export default function ProjectDashboard({ data, recentChanges, onFileOpen, onRe
           </div>
         </>
       )}
+
+      <OrphanDocsSection paths={orphanDocs} onFileOpen={onFileOpen} rootPath={data.projectPath} />
     </div>
   )
 }
