@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" href="data:," />
+    <link rel="icon" type="image/svg+xml" href="/vibe-mark.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Vibe</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -10,14 +10,14 @@
     <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
       :root {
-        --bg:         #F5F0E8;
-        --surface:    #FDFAF4;
-        --surface-2:  #EDE8DC;
-        --text:       #1A1612;
-        --muted:      #8C8070;
+        --bg:         #F4F3EF;
+        --surface:    #FCFBF9;
+        --surface-2:  #ECEAE4;
+        --text:       #1A1916;
+        --muted:      #7C7874;
         --accent:     #C85A2A;
-        --accent-sub: #F0DDD2;
-        --border:     #D9D2C2;
+        --accent-sub: #EED8CE;
+        --border:     #D5D1CA;
         --success:    #3A7D52;
         --warning:    #B07A2A;
         --error:      #9B3030;
@@ -25,19 +25,29 @@
         --search-current: rgba(200, 90, 42, 0.28);
       }
       [data-theme="dark"] {
-        --bg:         #12100E;
-        --surface:    #1C1916;
-        --surface-2:  #242018;
-        --text:       #EDE5D8;
-        --muted:      #7A6F60;
+        --bg:         #131312;
+        --surface:    #1B1B19;
+        --surface-2:  #22211E;
+        --text:       #E9E6E0;
+        --muted:      #757370;
         --accent:     #E8703A;
         --accent-sub: #2A1C12;
-        --border:     #2E2820;
+        --border:     #2C2A27;
         --success:    #4A9E68;
         --warning:    #C89040;
         --error:      #C04848;
         --search-match:   rgba(232, 112, 58, 0.15);
         --search-current: rgba(232, 112, 58, 0.32);
+      }
+      .vibe-logo {
+        font-family: 'Instrument Serif', serif;
+        font-style: italic;
+        color: var(--text);
+        line-height: 1.1;
+      }
+      .vibe-logo-dot {
+        font-style: normal;
+        color: var(--accent);
       }
       @keyframes badge-pulse {
         0%, 100% { opacity: 1; }

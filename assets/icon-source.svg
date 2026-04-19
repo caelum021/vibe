@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="0" y="0" width="1024" height="1024" rx="184" ry="184" fill="#F4F3EF"/>
+  <text x="471" y="778"
+        font-family="'Instrument Serif', 'Apple Garamond', 'Times New Roman', serif"
+        font-style="italic"
+        font-weight="400"
+        font-size="860"
+        fill="#1A1916"
+        text-anchor="middle"
+        dominant-baseline="alphabetic">v</text>
+  <circle cx="737" cy="737" r="98" fill="#C85A2A"/>
+</svg>

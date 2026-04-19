@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased]
+
+### Branding
+- Cool-shift palette — neutral chroma reduced to visually separate from warm cream/coral palettes. Rust accent (`#C85A2A` / `#E8703A`) retained as brand signature.
+- `vibe.` logo mark — Instrument Serif italic `vibe` with an accent-colored period. Applied to window title, dashboard header, About modal, splash.
+- New app icon — `v.` monogram (Instrument Serif italic `v` + rust dot). Regenerated full macOS / Windows / iOS / Android icon set via `tauri icon`.
+- SVG favicon at `client/public/vibe-mark.svg`.
+
 ## [1.0.2] - 2026-04-18
 
 ### Added

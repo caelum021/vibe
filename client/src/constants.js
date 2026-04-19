@@ -36,7 +36,7 @@ export const getDocIcon = (name) => DOC_ICON_MAP[name] || getIcon(name).ch
 export const DOC_EXTENSIONS = new Set(['md','mdx','txt','rst','doc','docx','pdf'])
 export const DOC_FOLDERS    = new Set(['docs','doc','documentation','notes','wiki','pages','tasks'])
 export const EXT_TO_LANG = { js:'JavaScript', jsx:'JSX', ts:'TypeScript', tsx:'TSX', rs:'Rust', py:'Python', css:'CSS', scss:'CSS', html:'HTML', json:'JSON', toml:'TOML', md:'Markdown', mdx:'Markdown', sh:'Shell' }
-export const LANG_COLORS = { JSX:'#E8703A', JavaScript:'#F0C945', TypeScript:'#3178C6', TSX:'#61DAFB', Rust:'#9C4221', Python:'#3572A5', CSS:'#563D7C', HTML:'#E34C26', JSON:'#A0A0A0', TOML:'#9C4221', Markdown:'#5D8FBD', Shell:'#89E051', Other:'#8C8070' }
+export const LANG_COLORS = { JSX:'#E8703A', JavaScript:'#F0C945', TypeScript:'#3178C6', TSX:'#61DAFB', Rust:'#9C4221', Python:'#3572A5', CSS:'#563D7C', HTML:'#E34C26', JSON:'#A0A0A0', TOML:'#9C4221', Markdown:'#5D8FBD', Shell:'#89E051', Other:'#857B70' }
 
 // ── Footer shortcut arrays ────────────────────────────────────────────────────
 export const SHORTCUTS_VIEWER_VIEW       = [['E','Edit'], ['Space','Scroll'], ['Ctrl+F','Search'], ['Ctrl+B','Sidebar'], ['Esc','Close']]

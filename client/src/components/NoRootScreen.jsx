@@ -123,7 +123,7 @@ function NoRootScreen({ projects, onOpen, onPick, onProjectsChange }) {
 
   return (
     <div style={{ width:'100%', height:'100vh', background:'var(--bg)', display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:'24px' }}>
-      <h1 style={{ fontFamily:FONT_SERIF, fontStyle:'italic', color:'var(--text)', fontSize:'32px', fontWeight:400, margin:0 }}>vibe</h1>
+      <h1 className="vibe-logo" style={{ fontSize:'32px', fontWeight:400, margin:0 }}>vibe<span className="vibe-logo-dot">.</span></h1>
       <p style={{ color:'var(--muted)', fontSize:'14px', margin:0 }}>프로젝트 폴더를 선택하세요</p>
       <button onClick={onPick} style={{ background:'var(--accent-sub)', border:'1px solid var(--accent)', color:'var(--accent)', cursor:'pointer', padding:'10px 24px', borderRadius:'6px', fontSize:'14px', fontFamily:FONT_UI }}>폴더 열기…</button>
       {projects.length > 0 && (

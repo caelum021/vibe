@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "vibe",
+        "title": "vibe.",
         "width": 1280,
         "height": 800,
         "minWidth": 800,

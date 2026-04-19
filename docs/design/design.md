@@ -65,28 +65,32 @@ Claude(warm cream/coral) 계열과의 시각적 분리 및 브랜드 명료화�
 #### Light — Daylight (cool-shift)
 
 ```css
---bg:          #F2EEE5;  /* cool ivory — aged paper, chroma 살짝 감소 */
---surface:     #FAF8F2;  /* off-white — viewer pane */
---surface-2:   #E9E5D9;  /* faint fold — titlebar, hover bg */
---text:        #1A1814;  /* near-black, 덜 따뜻 */
---muted:       #857B70;  /* faded ink — metadata, shortcuts */
+--bg:          #F4F3EF;  /* near-white paper, yellow cast 제거 */
+--surface:     #FCFBF9;  /* near-white — viewer pane */
+--surface-2:   #ECEAE4;  /* neutral fold — titlebar, hover bg */
+--text:        #1A1916;  /* near-black, neutral warmth */
+--muted:       #7C7874;  /* near-neutral gray — metadata */
 --accent:      #C85A2A;  /* rust orange — 유지 (브랜드 시그니처) */
---accent-sub:  #EEDBD2;  /* rust wash */
---border:      #D3CCBE;  /* old paper edge */
+--accent-sub:  #EED8CE;  /* rust wash */
+--border:      #D5D1CA;  /* paper edge, 덜 노란 */
 ```
+
+**Adjustment (2026-04-19 후속)**: 초기 cool-shift(#F2EEE5 계열)가 "여전히 노란끼가 남음" 피드백. R-B 채널 차이를 5~12 수준으로 축소해 near-neutral off-white로 한 단계 더 눌림. 이전 값: bg=F2EEE5 surface=FAF8F2 surface-2=E9E5D9 muted=857B70 accent-sub=EEDBD2 border=D3CCBE. "warm paper reading surface" 기조는 유지하되 yellow cast는 최소화. rust accent 불변.
 
 #### Dark — Midnight (cool-shift)
 
 ```css
---bg:          #131210;  /* near-black, 중립 방향 */
---surface:     #1B1917;  /* walnut, chroma 감소 */
---surface-2:   #222019;  /* slightly lighter */
---text:        #EBE5DA;  /* off-white, 덜 따뜻 */
---muted:       #77716A;  /* dim neutral — orange tinge 제거 */
+--bg:          #131312;  /* near-neutral dark, yellow cast 제거 */
+--surface:     #1B1B19;  /* walnut, chroma 더 감소 */
+--surface-2:   #22211E;  /* slightly lighter, 덜 노란 */
+--text:        #E9E6E0;  /* off-white, near-neutral */
+--muted:       #757370;  /* near-neutral gray */
 --accent:      #E8703A;  /* warm ember — 유지 */
---accent-sub:  #2A1C12;  /* ember shadow */
---border:      #2C2923;  /* dark seam */
+--accent-sub:  #2A1C12;  /* ember shadow — rust 계열 유지 */
+--border:      #2C2A27;  /* dark seam, 덜 노란 */
 ```
+
+**Adjustment (2026-04-19 후속)**: 라이트 모드와 동일 방향으로 다크도 yellow cast 축소. 이전 값: bg=131210 surface=1B1917 surface-2=222019 text=EBE5DA muted=77716A border=2C2923. accent / accent-sub(rust ember) 는 불변 — 브랜드 시그니처.
 
 적용은 v1.1.0 브랜딩 트랙에서 CSS 변수 교체. 대시보드·IA 전면 개편은 [`vibe-design-system-v2-proposal.md`](./vibe-design-system-v2-proposal.md)에 보관 (deferred).
 

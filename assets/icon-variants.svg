@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 1200" width="1200" height="1200">
+  <rect x="0" y="0" width="1200" height="1200" fill="#EEEBE3"/>
+
+  <g font-family="'Geist', 'Helvetica Neue', sans-serif" font-size="32" fill="#555" text-anchor="middle">
+    <text x="300" y="70">A · v. monogram</text>
+    <text x="900" y="70">C · vibe. wordmark</text>
+  </g>
+
+  <!-- A: v. monogram -->
+  <g transform="translate(50, 350)">
+    <rect x="0" y="0" width="500" height="500" rx="90" ry="90" fill="#F4F3EF"/>
+    <text x="230" y="380" font-family="'Instrument Serif', 'Apple Garamond', 'Times New Roman', serif"
+          font-style="italic" font-weight="400" font-size="420" fill="#1A1916" text-anchor="middle">v</text>
+    <circle cx="360" cy="360" r="48" fill="#C85A2A"/>
+  </g>
+
+  <!-- C: vibe. wordmark (gap fixed so . is clearly separate) -->
+  <g transform="translate(650, 350)">
+    <rect x="0" y="0" width="500" height="500" rx="90" ry="90" fill="#F4F3EF"/>
+    <text x="230" y="310" font-family="'Instrument Serif', 'Apple Garamond', 'Times New Roman', serif"
+          font-style="italic" font-weight="400" font-size="210" fill="#1A1916" text-anchor="middle">vibe</text>
+    <circle cx="400" cy="300" r="22" fill="#C85A2A"/>
+  </g>
+</svg>

@@ -58,7 +58,7 @@ function AboutModal({ onClose }) {
     <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000 }}>
       <div onClick={e => e.stopPropagation()} style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'12px', padding:'36px 40px', width:'320px', display:'flex', flexDirection:'column', gap:'16px', boxShadow:'0 16px 48px rgba(0,0,0,0.2)' }}>
         <div>
-          <div style={{ fontFamily:FONT_SERIF, fontStyle:'italic', fontSize:'28px', fontWeight:400, color:'var(--text)', lineHeight:1.1 }}>vibe</div>
+          <div className="vibe-logo" style={{ fontSize:'28px', fontWeight:400 }}>vibe<span className="vibe-logo-dot">.</span></div>
           <div style={{ fontFamily:FONT_MONO, fontSize:'11px', color:'var(--muted)', marginTop:'4px' }}>{version ? `v${version}` : ''}</div>
         </div>
         <div style={{ fontSize:'13px', color:'var(--muted)', lineHeight:1.6 }}>
@@ -363,7 +363,7 @@ function App() {
     setDashboardData(null)
     setGitInfo({ isRepo: false, branch: null, filesByAbs: new Map(), dirtyCount: 0 })
     setRootPath(path)
-    getCurrentWindow().setTitle(`vibe — ${basenameOf(path)}`)
+    getCurrentWindow().setTitle(`vibe. — ${basenameOf(path)}`)
     const list = addProject(path)
     setProjects(list)
     setRefreshKey(k => k + 1)
@@ -372,7 +372,7 @@ function App() {
 
   useEffect(() => {
     api.getRoot().then(r => {
-      if (r) { const list = addProject(r); setProjects(list); getCurrentWindow().setTitle(`vibe — ${basenameOf(r)}`) }
+      if (r) { const list = addProject(r); setProjects(list); getCurrentWindow().setTitle(`vibe. — ${basenameOf(r)}`) }
       setRootReady(!!r); setRootPath(r || '')
     }).catch(() => setRootReady(false))
   }, [])
