@@ -15,6 +15,7 @@ const FileViewer = ({
   isFocused, onFocus, onClose, innerRef,
   gitDirty, diffMode, onEnterDiff, onExitDiff,
   externallyChanged, onReload, openSearchRef, closeSearchRef,
+  rootPath, onLinkOpen,
 }) => {
   const [mdTab, setMdTab] = useState('edit')
   const [diffData, setDiffData] = useState(null)
@@ -348,9 +349,9 @@ const FileViewer = ({
                 style={{ flex:1, background:'var(--surface)', color:'var(--text)', border:'none', outline:'none', resize:'none', padding:`${EDIT_PADDING_PX}px`, fontFamily:FONT_MONO, fontSize:'12.5px', lineHeight:`${LINE_HEIGHT_PX}px`, letterSpacing:'0.01em', whiteSpace: wrapEnabled ? 'pre-wrap' : 'pre', wordBreak: wrapEnabled ? 'break-all' : undefined }} />
             </div>
           ) : showPreviewPane ? (
-            <MarkdownView content={editContent} isDark={isDark} fileDirPath={fileDirPath} />
+            <MarkdownView content={editContent} isDark={isDark} fileDirPath={fileDirPath} rootPath={rootPath} onLinkOpen={onLinkOpen} />
           ) : isMd ? (
-            <MarkdownView content={content} isDark={isDark} fileDirPath={fileDirPath}
+            <MarkdownView content={content} isDark={isDark} fileDirPath={fileDirPath} rootPath={rootPath} onLinkOpen={onLinkOpen}
               searchQuery={searchOpen ? searchQuery : ''} currentMatchIdx={currentMatchIdx} onMatchesFound={setMdMatchCount} />
           ) : (
             <SyntaxHighlighter

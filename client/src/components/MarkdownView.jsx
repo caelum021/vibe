@@ -23,7 +23,61 @@ function MarkdownImage({ src, alt, fileDirPath }) {
   return <img src={dataUrl} alt={alt || ''} style={{ maxWidth:'100%', borderRadius:'4px', margin:'8px 0' }} />
 }
 
-function makeMarkdownComponents(isDark, fileDirPath) {
+const EXTERNAL_SCHEMES = ['http://', 'https://', 'mailto:', 'tel:']
+
+function classifyHref(href) {
+  if (!href) return { kind: 'invalid' }
+  const trimmed = href.trim()
+  if (!trimmed) return { kind: 'invalid' }
+  if (trimmed.startsWith('#')) return { kind: 'anchor' }
+  if (trimmed.startsWith('//')) return { kind: 'external', url: 'https:' + trimmed }
+  const lower = trimmed.toLowerCase()
+  if (EXTERNAL_SCHEMES.some(s => lower.startsWith(s))) return { kind: 'external', url: trimmed }
+  // Any other scheme-looking thing (e.g., `javascript:`, `file:`) — refuse rather than treat as internal
+  if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) return { kind: 'invalid' }
+  return { kind: 'internal', rel: trimmed }
+}
+
+function resolveInternal(rel, fileDirPath, rootPath) {
+  const noFrag = rel.split('#')[0]
+  const noQuery = noFrag.split('?')[0]
+  if (!noQuery) return null
+  const decoded = (() => { try { return decodeURIComponent(noQuery) } catch { return noQuery } })()
+  if (decoded.startsWith('/')) return (rootPath || '') + decoded
+  return (fileDirPath || '') + '/' + decoded
+}
+
+function InternalLink({ href, children, fileDirPath, rootPath, onLinkOpen }) {
+  const handleClick = (e) => {
+    e.preventDefault()
+    const abs = resolveInternal(href, fileDirPath, rootPath)
+    if (!abs || !onLinkOpen) return
+    const name = abs.split('/').filter(Boolean).pop() || abs
+    onLinkOpen({ path: abs, name, isDirectory: false })
+  }
+  return (
+    <a href={href} onClick={handleClick}
+       style={{ color:'var(--accent)', textDecoration:'underline', textUnderlineOffset:'2px', cursor:'pointer' }}>
+      {children}
+    </a>
+  )
+}
+
+function ExternalLink({ url, children }) {
+  const handleClick = (e) => {
+    e.preventDefault()
+    api.openExternal(url).catch(err => console.error('open_external failed:', err))
+  }
+  return (
+    <a href={url} onClick={handleClick}
+       style={{ color:'var(--accent)', textDecoration:'underline', textUnderlineOffset:'2px', cursor:'pointer' }}>
+      {children}
+      <span aria-hidden="true" style={{ fontSize:'0.85em', marginLeft:'2px', opacity:0.65 }}>↗</span>
+    </a>
+  )
+}
+
+function makeMarkdownComponents(isDark, fileDirPath, rootPath, onLinkOpen) {
   const border = '1px solid var(--border)'
   const hl = isDark ? vscDarkPlus : oneLight
   return {
@@ -37,7 +91,13 @@ function makeMarkdownComponents(isDark, fileDirPath) {
         ? <SyntaxHighlighter language={className?.replace('language-','') || 'text'} style={hl} customStyle={{ borderRadius:'6px', fontSize:'12px', marginBottom:'12px', border, fontFamily:FONT_MONO }}>{String(children).replace(/\n$/,'')}</SyntaxHighlighter>
         : <code style={{ background:'var(--surface-2)', padding:'1px 5px', borderRadius:'3px', color:'var(--accent)', fontSize:'11.5px', fontFamily:FONT_MONO, letterSpacing:'0.01em' }}>{children}</code>
     },
-    a: ({href, children}) => <a href={href} style={{ color:'var(--accent)', textDecoration:'underline', textUnderlineOffset:'2px' }} target="_blank" rel="noreferrer">{children}</a>,
+    a: ({href, children}) => {
+      const c = classifyHref(href)
+      if (c.kind === 'external') return <ExternalLink url={c.url}>{children}</ExternalLink>
+      if (c.kind === 'internal') return <InternalLink href={c.rel} fileDirPath={fileDirPath} rootPath={rootPath} onLinkOpen={onLinkOpen}>{children}</InternalLink>
+      // anchor or invalid — render as plain text styling, non-navigating
+      return <a href={href} onClick={e => e.preventDefault()} style={{ color:'var(--muted)', textDecoration:'underline', textUnderlineOffset:'2px', cursor:'default' }}>{children}</a>
+    },
     ul: ({children}) => <ul style={{ paddingLeft:'20px', marginBottom:'12px', marginTop:'6px' }}>{children}</ul>,
     ol: ({children}) => <ol style={{ paddingLeft:'20px', marginBottom:'12px', marginTop:'6px' }}>{children}</ol>,
     li: ({children}) => <li style={{ marginBottom:'6px', color:'var(--text)', lineHeight:'1.7' }}>{children}</li>,
@@ -53,8 +113,8 @@ function makeMarkdownComponents(isDark, fileDirPath) {
   }
 }
 
-export default function MarkdownView({ content, isDark, fileDirPath, searchQuery = '', currentMatchIdx = 0, onMatchesFound }) {
-  const components = useMemo(() => makeMarkdownComponents(isDark, fileDirPath), [isDark, fileDirPath])
+export default function MarkdownView({ content, isDark, fileDirPath, rootPath, onLinkOpen, searchQuery = '', currentMatchIdx = 0, onMatchesFound }) {
+  const components = useMemo(() => makeMarkdownComponents(isDark, fileDirPath, rootPath, onLinkOpen), [isDark, fileDirPath, rootPath, onLinkOpen])
   const containerRef = useRef(null)
   const currentMarkRef = useRef(null)
 

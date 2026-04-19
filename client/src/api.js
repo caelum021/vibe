@@ -52,6 +52,9 @@ export const getBrokenLinks = () =>
 export const getOrphanDocs = () =>
   invoke('get_orphan_docs')
 
+export const openExternal = (url) =>
+  invoke('open_external', { url })
+
 export const onFileChanged = (callback) =>
   listen('file-changed', (event) => callback(event.payload))
 
