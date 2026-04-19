@@ -40,5 +40,20 @@ export const gitStatus = () =>
 export const gitDiff = (path) =>
   invoke('git_diff', { path })
 
+export const getOutgoingLinks = (path) =>
+  invoke('get_outgoing_links', { path })
+
+export const getBacklinks = (path) =>
+  invoke('get_backlinks', { path })
+
+export const getBrokenLinks = () =>
+  invoke('get_broken_links')
+
+export const getOrphanDocs = () =>
+  invoke('get_orphan_docs')
+
 export const onFileChanged = (callback) =>
   listen('file-changed', (event) => callback(event.payload))
+
+export const onLinkIndexReady = (callback) =>
+  listen('link-index-ready', (event) => callback(event.payload))

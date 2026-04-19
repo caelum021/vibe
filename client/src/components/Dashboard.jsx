@@ -85,7 +85,7 @@ export default function ProjectDashboard({ data, recentChanges, onFileOpen, onRe
     <div style={{ flex:1, display:'flex', flexDirection:'column', overflowY:'auto', padding:'32px 48px', gap:'32px', userSelect:'text', WebkitUserSelect:'text' }}>
       <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:'16px' }}>
         <div style={{ minWidth:0 }}>
-          <div className="vibe-logo" style={{ fontSize:'26px', fontWeight:400 }}>vibe<span className="vibe-logo-dot">.</span></div>
+          <div className="vibe-logo" style={{ fontSize:'26px', fontWeight:400 }}>{projectName}</div>
           <div style={{ fontFamily:FONT_MONO, fontSize:'11px', color:'var(--muted)', marginTop:'4px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{projectPath}</div>
           {gitInfo?.isRepo && (
             <div style={{ fontFamily:FONT_MONO, fontSize:'11px', color:'var(--muted)', marginTop:'6px', display:'flex', alignItems:'center', gap:'8px' }}>

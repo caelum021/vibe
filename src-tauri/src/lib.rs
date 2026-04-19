@@ -1,10 +1,11 @@
 mod commands;
 pub mod constants;
 mod error;
+pub mod link_index;
 mod state;
 pub mod watcher;
 
-use commands::{dialog, file_ops, git, watcher_cmd};
+use commands::{dialog, file_ops, git, link_index as link_index_cmd, watcher_cmd};
 use state::AppState;
 use tauri::Manager;
 use tauri_plugin_cli::CliExt;
@@ -47,6 +48,10 @@ pub fn run() {
             dialog::pick_folder,
             git::git_status,
             git::git_diff,
+            link_index_cmd::get_outgoing_links,
+            link_index_cmd::get_backlinks,
+            link_index_cmd::get_broken_links,
+            link_index_cmd::get_orphan_docs,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

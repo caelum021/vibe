@@ -1,12 +1,14 @@
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use notify::RecommendedWatcher;
 
 use crate::error::AppError;
+use crate::link_index::LinkGraph;
 
 pub struct AppState {
     pub root: Mutex<Option<PathBuf>>,
     pub watcher: Mutex<Option<RecommendedWatcher>>,
+    pub link_graph: Arc<LinkGraph>,
 }
 
 impl AppState {
@@ -14,6 +16,7 @@ impl AppState {
         Self {
             root: Mutex::new(None),
             watcher: Mutex::new(None),
+            link_graph: Arc::new(LinkGraph::new()),
         }
     }
 

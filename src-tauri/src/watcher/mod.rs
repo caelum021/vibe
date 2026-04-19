@@ -1,10 +1,12 @@
 mod debounce;
 
 use crate::constants::IGNORED;
-use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
+use crate::link_index::{is_md, LinkGraph};
+use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::Serialize;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::mpsc;
+use std::sync::Arc;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 
@@ -17,6 +19,7 @@ pub struct FileChangedPayload {
 pub fn spawn_watcher(
     root: PathBuf,
     app: AppHandle,
+    graph: Arc<LinkGraph>,
 ) -> Result<RecommendedWatcher, notify::Error> {
     let (tx, rx) = mpsc::channel::<notify::Result<Event>>();
     let mut watcher = RecommendedWatcher::new(tx, Config::default())?;
@@ -24,6 +27,14 @@ pub fn spawn_watcher(
 
     std::thread::spawn(move || {
         debounce::debounced_receiver(rx, Duration::from_millis(150), |events| {
+            for event in &events {
+                for p in &event.paths {
+                    if is_ignored(p) {
+                        continue;
+                    }
+                    apply_to_graph(&graph, &event.kind, p);
+                }
+            }
             let payload = build_payload(events);
             if !payload.paths.is_empty() {
                 let _ = app.emit("file-changed", &payload);
@@ -32,6 +43,19 @@ pub fn spawn_watcher(
     });
 
     Ok(watcher)
+}
+
+fn apply_to_graph(graph: &LinkGraph, kind: &EventKind, path: &Path) {
+    if !is_md(path) {
+        return;
+    }
+    match kind {
+        EventKind::Remove(_) => graph.remove_file(path),
+        _ => match std::fs::read_to_string(path) {
+            Ok(source) => graph.reindex_file(path, &source),
+            Err(_) => graph.remove_file(path),
+        },
+    }
 }
 
 fn build_payload(events: Vec<Event>) -> FileChangedPayload {
