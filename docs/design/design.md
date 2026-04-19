@@ -58,6 +58,38 @@
 --border:      #2E2820;  /* dark seam */
 ```
 
+### Palette — Cool-shift (2026-04-19, current)
+
+Claude(warm cream/coral) 계열과의 시각적 분리 및 브랜드 명료화를 위한 미세 조정. rust accent는 유지, "warm paper reading surface" 기조는 유지하되 neutral의 chroma를 살짝 낮춤. 2026-04-04 팔레트는 위에 이력으로 보존.
+
+#### Light — Daylight (cool-shift)
+
+```css
+--bg:          #F2EEE5;  /* cool ivory — aged paper, chroma 살짝 감소 */
+--surface:     #FAF8F2;  /* off-white — viewer pane */
+--surface-2:   #E9E5D9;  /* faint fold — titlebar, hover bg */
+--text:        #1A1814;  /* near-black, 덜 따뜻 */
+--muted:       #857B70;  /* faded ink — metadata, shortcuts */
+--accent:      #C85A2A;  /* rust orange — 유지 (브랜드 시그니처) */
+--accent-sub:  #EEDBD2;  /* rust wash */
+--border:      #D3CCBE;  /* old paper edge */
+```
+
+#### Dark — Midnight (cool-shift)
+
+```css
+--bg:          #131210;  /* near-black, 중립 방향 */
+--surface:     #1B1917;  /* walnut, chroma 감소 */
+--surface-2:   #222019;  /* slightly lighter */
+--text:        #EBE5DA;  /* off-white, 덜 따뜻 */
+--muted:       #77716A;  /* dim neutral — orange tinge 제거 */
+--accent:      #E8703A;  /* warm ember — 유지 */
+--accent-sub:  #2A1C12;  /* ember shadow */
+--border:      #2C2923;  /* dark seam */
+```
+
+적용은 v1.1.0 브랜딩 트랙에서 CSS 변수 교체. 대시보드·IA 전면 개편은 [`vibe-design-system-v2-proposal.md`](./vibe-design-system-v2-proposal.md)에 보관 (deferred).
+
 ### Semantic
 
 ```css
@@ -68,6 +100,34 @@
 ```
 
 - **Dark mode strategy:** Warm dark, not cold slate. Same hue family as light mode (warm brown-black). Reduce accent saturation slightly. Surfaces use brown-tinted darks, never pure #000 or blue-grays.
+
+## Logo (추가 — 2026-04-19)
+
+브랜드 마크. 기존 로고 타이포(Instrument Serif italic)는 유지하고, 끝에 accent 색 마침표를 붙여 vibe의 "액션이 완결되는 지점" 의미를 시각화한다. 이것만으로도 Claude 계열 브랜드와 구분된다.
+
+```jsx
+<span className="vibe-logo">
+  vibe<span className="vibe-logo-dot">.</span>
+</span>
+```
+
+```css
+.vibe-logo {
+  font-family: var(--font-serif-italic);   /* Instrument Serif italic */
+  font-style: italic;
+  color: var(--text);
+}
+.vibe-logo-dot {
+  font-style: normal;                       /* 마침표는 이탤릭 아님 */
+  color: var(--accent);                     /* 항상 rust accent — 검정 금지 */
+}
+```
+
+**규칙:**
+- 마침표는 **항상** `--accent` 색. `--text` 검정으로 두지 않는다.
+- 마침표 타이포는 **normal**(이탤릭 아님) — 점이 이탤릭으로 찌그러지지 않도록.
+- 최소 렌더 크기 24px. 그 이하에서는 앱 아이콘(파비콘/dock)처럼 "마침표가 시각적으로 보장되는" 별도 에셋 사용.
+- 앱 아이콘, 파비콘, DMG 배경, About 모달 모두 마침표 일관 반영.
 
 ## Spacing
 
@@ -133,3 +193,6 @@
 | 2026-04-04 | Geist over Inter | Inter is overused in dev tools. Geist is stable at small sizes with better tabular numbers. |
 | 2026-04-10 | Dirty indicator: `*` + color, not `●` | 큰 점은 "맹구 코" — 우리 기조(ambient, reading surface)에 안 맞음. 색상 전환 + 가벼운 기호로 충분. |
 | 2026-04-18 | Git badge 5-color: added=green, untracked=teal, modified=orange, deleted=red, renamed=steel blue | 상태별 의미가 다르므로 색으로 구분. 우선순위 있는 bubble-up으로 폴더에도 반영. |
+| 2026-04-19 | 팔레트 cool-shift (neutral chroma 감소, rust accent 유지) | Claude의 warm cream/coral 팔레트와 시각적으로 가까워져 브랜드 혼동 발생. "warm paper reading surface" 기조는 유지하되 neutral만 덜 따뜻하게. 이전 팔레트는 섹션으로 보존. |
+| 2026-04-19 | 로고 마침표 — normal weight, accent 색 고정 | "액션이 완결되는 지점"의 브랜드 시그니처. 로고 타이포(Instrument Serif italic)는 유지. 앱 아이콘·파비콘·DMG·About 모달 일관 반영 필요. |
+| 2026-04-19 | 대시보드·IA 전면 개편 defer — markdown 1급 시민(v1.1.0) 우선 | 옵시디언 앵커 함정 경계. 조용한 도구 기조는 단계별로 조정. markdown 기능이 새 surface(그래프, 링크 탐색 등)를 만들면 그때 [`vibe-design-system-v2-proposal.md`](./vibe-design-system-v2-proposal.md)를 재료로 재설계. |
