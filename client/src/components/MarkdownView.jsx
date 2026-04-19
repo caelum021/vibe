@@ -8,6 +8,43 @@ import rehypeRaw from 'rehype-raw'
 import * as api from '../api'
 import { FONT_MONO, FONT_SERIF } from '../constants'
 
+// CommonMark doesn't close `**...**` emphasis when a letter follows the closer,
+// so `**강조**를` never becomes bold. Preprocess by converting that exact
+// pattern into raw `<strong>` HTML (rehype-raw is enabled). Code fences and
+// inline code are left untouched.
+const HANGUL_LOOKAHEAD = /\*\*([^*\n]+?)\*\*(?=[\uAC00-\uD7A3])/g
+
+function preprocessKoreanBold(src) {
+  if (!src || src.indexOf('**') === -1) return src
+  const lines = src.split('\n')
+  let inFence = false
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    if (/^\s{0,3}(```|~~~)/.test(line)) { inFence = !inFence; continue }
+    if (inFence) continue
+    lines[i] = transformLineOutsideInlineCode(line)
+  }
+  return lines.join('\n')
+}
+
+function transformLineOutsideInlineCode(line) {
+  if (line.indexOf('`') === -1) return line.replace(HANGUL_LOOKAHEAD, '<strong>$1</strong>')
+  let out = ''
+  let i = 0
+  while (i < line.length) {
+    if (line[i] === '`') {
+      const close = line.indexOf('`', i + 1)
+      if (close !== -1) { out += line.slice(i, close + 1); i = close + 1; continue }
+      out += line.slice(i); break
+    }
+    const next = line.indexOf('`', i)
+    const end = next === -1 ? line.length : next
+    out += line.slice(i, end).replace(HANGUL_LOOKAHEAD, '<strong>$1</strong>')
+    i = end
+  }
+  return out
+}
+
 function MarkdownImage({ src, alt, fileDirPath }) {
   const [dataUrl, setDataUrl] = useState(null)
   useEffect(() => {
@@ -115,6 +152,7 @@ function makeMarkdownComponents(isDark, fileDirPath, rootPath, onLinkOpen) {
 
 export default function MarkdownView({ content, isDark, fileDirPath, rootPath, onLinkOpen, searchQuery = '', currentMatchIdx = 0, onMatchesFound }) {
   const components = useMemo(() => makeMarkdownComponents(isDark, fileDirPath, rootPath, onLinkOpen), [isDark, fileDirPath, rootPath, onLinkOpen])
+  const processedContent = useMemo(() => preprocessKoreanBold(content), [content])
   const containerRef = useRef(null)
   const currentMarkRef = useRef(null)
 
@@ -190,7 +228,7 @@ export default function MarkdownView({ content, isDark, fileDirPath, rootPath, o
 
   return (
     <div ref={containerRef} style={{ color:'var(--text)', lineHeight:'1.75', fontSize:'14px', maxWidth:'72ch' }}>
-      <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]} components={components}>{content}</ReactMarkdown>
+      <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]} components={components}>{processedContent}</ReactMarkdown>
     </div>
   )
 }
