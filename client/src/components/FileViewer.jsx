@@ -7,6 +7,7 @@ import * as api from '../api'
 import CodeRow from './CodeRow'
 import DiffView from './DiffView'
 import MarkdownView from './MarkdownView'
+import BacklinksPanel from './BacklinksPanel'
 import { resolveKey, LINE_HEIGHT_PX, EDIT_PADDING_PX, LINE_NUM_WIDTH, FONT_MONO, FONT_UI, EXT_TO_DISPLAY } from '../constants'
 
 const FileViewer = ({
@@ -351,8 +352,11 @@ const FileViewer = ({
           ) : showPreviewPane ? (
             <MarkdownView content={editContent} isDark={isDark} fileDirPath={fileDirPath} rootPath={rootPath} onLinkOpen={onLinkOpen} />
           ) : isMd ? (
-            <MarkdownView content={content} isDark={isDark} fileDirPath={fileDirPath} rootPath={rootPath} onLinkOpen={onLinkOpen}
-              searchQuery={searchOpen ? searchQuery : ''} currentMatchIdx={currentMatchIdx} onMatchesFound={setMdMatchCount} />
+            <>
+              <MarkdownView content={content} isDark={isDark} fileDirPath={fileDirPath} rootPath={rootPath} onLinkOpen={onLinkOpen}
+                searchQuery={searchOpen ? searchQuery : ''} currentMatchIdx={currentMatchIdx} onMatchesFound={setMdMatchCount} />
+              <BacklinksPanel path={selectedFile?.path} rootPath={rootPath} onLinkOpen={onLinkOpen} />
+            </>
           ) : (
             <SyntaxHighlighter
               language={ext || 'text'}
