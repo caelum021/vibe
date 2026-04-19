@@ -1,9 +1,8 @@
-# vibe — AI와 코딩할 때, 문서로 소통하는 도구
+# vibe
 
-**vibe .** 그게 전부입니다.
+**AI 네이티브 코딩을 위한 창.**
 
-AI가 코드를 바꾸면, vibe에서 바로 확인하고, 직접 고쳐서 방향을 잡습니다.
-디버거도 컴파일러도 없습니다. 문서를 쓰고, 읽고, 고치는 것. 그게 AI와의 협업입니다.
+프로젝트 디렉토리에서 `vibe .` 한 줄이면 됩니다.
 
 <p align="center">
   <img src="./assets/screenshot-light.png" width="720" alt="Vibe — 라이트 모드" />
@@ -12,9 +11,13 @@ AI가 코드를 바꾸면, vibe에서 바로 확인하고, 직접 고쳐서 방�
   <img src="./assets/screenshot-dark.png" width="720" alt="Vibe — 다크 모드" />
 </p>
 
+AI가 코드를 바꾸면, vibe에서 바로 확인하고, 직접 고쳐서 방향을 잡습니다. 디버거도 컴파일러도 없습니다. 문서를 쓰고, 읽고, 고치는 것. 그게 AI와의 협업입니다.
+
+[English README](./README.md)
+
 <br>
 
-## 설치
+## 🚀 시작하기
 
 [GitHub Releases](https://github.com/solpop-arch/vibe/releases)에서 최신 버전을 다운로드하세요.
 

@@ -1,12 +1,8 @@
 # vibe
 
-Your window into AI-native coding.
+**Your window into AI-native coding.**
 
-**vibe .** That's all you need.
-
-[한국어 설명 (Korean README)](./README.ko.md)
-
-When AI changes your code, vibe lets you see what happened, review the diff, and edit files to steer direction — all in real time. No debugger, no compiler. Just documents, edits, and context.
+Run `vibe .` in any project directory. That's all you need.
 
 <p align="center">
   <img src="./assets/screenshot-light.png" width="720" alt="Vibe — light mode" />
@@ -15,9 +11,13 @@ When AI changes your code, vibe lets you see what happened, review the diff, and
   <img src="./assets/screenshot-dark.png" width="720" alt="Vibe — dark mode" />
 </p>
 
+When AI changes your code, vibe shows you what happened, lets you review the changes, and edit files to steer direction — all in real time. No debugger, no compiler. Just documents, edits, and context.
+
+[한국어 설명 (Korean README)](./README.ko.md)
+
 <br>
 
-## Install
+## 🚀 Getting Started
 
 Download the latest version from [GitHub Releases](https://github.com/solpop-arch/vibe/releases).
 
