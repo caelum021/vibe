@@ -1,6 +1,18 @@
 # Changelog
 
-## [Unreleased]
+## [1.1.0] - 2026-04-20
+
+마크다운 1급 시민화 — 문서 간 링크 그래프를 중심으로 편집기가 구조를 이해한다.
+
+### Added
+- Link graph infrastructure — background-built project-wide markdown index, watcher-driven incremental updates, `link-index-ready` event
+- Internal link navigation — `[text](./foo.md)` opens in the viewer; external URLs open via OS (scheme whitelist: http/https/mailto/tel); `↗` icon marks external links
+- Backlinks panel — collapsible "Referenced by" section under each markdown file with source path, line, and snippet
+- Broken link detection — red dotted underline + native tooltip for broken inline links; dashed placeholder box for broken images
+- Dashboard "Broken Links" section — source:line + link kind + broken href, click-to-open (hidden when empty)
+- Dashboard "Orphan Docs" section — markdown files referenced nowhere (hidden when empty)
+- File-view history — back/forward buttons and `⌘[` / `⌘]` / `⌘←` / `⌘→` shortcuts to retrace link-driven navigation
+- Per-entry scroll memory — revisiting a file via back/forward restores its last scroll position; Esc back to dashboard clears history
 
 ### Branding
 - Cool-shift palette — neutral chroma reduced to visually separate from warm cream/coral palettes. Rust accent (`#C85A2A` / `#E8703A`) retained as brand signature.
