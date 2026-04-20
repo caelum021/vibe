@@ -224,7 +224,20 @@ impl LinkGraph {
         let g = self.inner.read().unwrap();
         let root = g.root.as_ref();
 
-        let mut md_paths: Vec<&PathBuf> = g.all_md.iter().collect();
+        let has_any_link = |md: &PathBuf| -> bool {
+            let inc = g.incoming.get(md)
+                .map(|l| l.iter().any(|b| &b.source != md))
+                .unwrap_or(false);
+            let out = g.outgoing.get(md)
+                .map(|l| l.iter().any(|e| {
+                    !e.is_external
+                        && e.target.as_ref().map(|t| is_md(t) && t != md).unwrap_or(false)
+                }))
+                .unwrap_or(false);
+            inc || out
+        };
+
+        let mut md_paths: Vec<&PathBuf> = g.all_md.iter().filter(|p| has_any_link(p)).collect();
         md_paths.sort();
         md_paths.truncate(NODE_CAP);
 
