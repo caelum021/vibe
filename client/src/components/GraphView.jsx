@@ -1,22 +1,29 @@
-import { useEffect, useRef, memo } from 'react'
+import { useEffect, useRef, useState, memo } from 'react'
 import { forceSimulation, forceLink, forceManyBody, forceCollide, forceX, forceY } from 'd3-force'
 import { select } from 'd3-selection'
 import { zoom, zoomIdentity } from 'd3-zoom'
 
-const CHARGE       = -180
-const LINK_DIST    = 80
-const COLLIDE_R    = 18
+const CHARGE       = -200
+const LINK_DIST    = 90
 const NODE_R       = 6
 const ORPHAN_R     = 5
 const ALPHA_DECAY  = 0.03
 const TICK_MAX     = 300
 const LABEL_MAX    = 22
+const LABEL_CHAR_W = 5.5
+const LABEL_PAD    = 8
+
+const labelWidth = (label) => Math.min(label.length, LABEL_MAX) * LABEL_CHAR_W
+const nodeCollide = (d) => (labelWidth(d.label) + NODE_R * 2 + LABEL_PAD) / 2
 
 function GraphView({ data, onNodeClick }) {
   const svgRef = useRef(null)
   const onNodeClickRef = useRef(onNodeClick)
+  const interactiveRef = useRef(false)
+  const [interactive, setInteractive] = useState(false)
 
   useEffect(() => { onNodeClickRef.current = onNodeClick }, [onNodeClick])
+  useEffect(() => { interactiveRef.current = interactive }, [interactive])
 
   useEffect(() => {
     const el = svgRef.current
@@ -31,6 +38,11 @@ function GraphView({ data, onNodeClick }) {
 
     const zoomBehavior = zoom()
       .scaleExtent([0.3, 4])
+      .filter((event) => {
+        if (event.type === 'wheel') return interactiveRef.current
+        if (event.type === 'dblclick') return false
+        return !event.button
+      })
       .on('zoom', (event) => g.attr('transform', event.transform))
     svg.call(zoomBehavior)
     svg.on('dblclick.zoom', null)
@@ -42,15 +54,16 @@ function GraphView({ data, onNodeClick }) {
       .map(e => ({ source: idToIdx.get(e.source), target: idToIdx.get(e.target) }))
 
     const maxDepth = nodes.reduce((m, n) => Math.max(m, n.depth || 0), 0)
-    const xPad = 60
-    const colWidth = maxDepth > 0 ? (width - xPad * 2) / maxDepth : 0
+    const leftPad  = 60
+    const rightPad = 160
+    const colWidth = maxDepth > 0 ? (width - leftPad - rightPad) / maxDepth : 0
 
     const sim = forceSimulation(nodes)
       .force('link',    forceLink(links).id((_, i) => i).distance(LINK_DIST))
       .force('charge',  forceManyBody().strength(CHARGE))
-      .force('x',       forceX(d => xPad + (d.depth || 0) * colWidth).strength(0.35))
-      .force('y',       forceY(height / 2).strength(0.08))
-      .force('collide', forceCollide(COLLIDE_R))
+      .force('x',       forceX(d => leftPad + (d.depth || 0) * colWidth).strength(0.35))
+      .force('y',       forceY(height / 2).strength(0.12))
+      .force('collide', forceCollide(nodeCollide))
       .alphaDecay(ALPHA_DECAY)
       .stop()
 
@@ -96,8 +109,9 @@ function GraphView({ data, onNodeClick }) {
       .attr('pointer-events', 'none')
 
     const xs = nodes.map(n => n.x)
+    const xsRight = nodes.map(n => n.x + NODE_R + 4 + labelWidth(n.label))
     const ys = nodes.map(n => n.y)
-    const x0 = Math.min(...xs), x1 = Math.max(...xs)
+    const x0 = Math.min(...xs), x1 = Math.max(...xsRight)
     const y0 = Math.min(...ys), y1 = Math.max(...ys)
     const pad = 40
     const dx = x1 - x0 || 1
@@ -110,15 +124,44 @@ function GraphView({ data, onNodeClick }) {
     return () => { sim.stop(); svg.on('.zoom', null) }
   }, [data])
 
+  useEffect(() => {
+    if (!interactive) return
+    const onKey = (e) => { if (e.key === 'Escape') setInteractive(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [interactive])
+
   if (!data || data.nodes.length === 0) return null
 
   return (
-    <svg
-      ref={svgRef}
-      width="100%"
-      height="100%"
-      style={{ display: 'block', background: 'transparent' }}
-    />
+    <div
+      onClick={() => setInteractive(true)}
+      onMouseLeave={() => setInteractive(false)}
+      style={{
+        position: 'relative',
+        width: '100%',
+        height: '100%',
+        boxShadow: interactive ? 'inset 0 0 0 1px var(--accent)' : 'none',
+        transition: 'box-shadow 120ms ease',
+      }}
+    >
+      <svg
+        ref={svgRef}
+        width="100%"
+        height="100%"
+        style={{ display: 'block', background: 'transparent' }}
+      />
+      <div
+        style={{
+          position: 'absolute', top: 8, right: 10,
+          fontSize: '10px', color: 'var(--muted)',
+          textTransform: 'uppercase', letterSpacing: '0.06em',
+          pointerEvents: 'none', opacity: 0.75,
+        }}
+      >
+        {interactive ? 'scroll to zoom · esc to exit' : 'click to interact'}
+      </div>
+    </div>
   )
 }
 
