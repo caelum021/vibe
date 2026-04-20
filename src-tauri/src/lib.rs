@@ -52,6 +52,7 @@ pub fn run() {
             link_index_cmd::get_backlinks,
             link_index_cmd::get_broken_links,
             link_index_cmd::get_orphan_docs,
+            link_index_cmd::get_graph_data,
             shell::open_external,
         ])
         .run(tauri::generate_context!())

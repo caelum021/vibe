@@ -1,5 +1,6 @@
 import { memo, useState, useCallback, useMemo } from 'react'
 import { FONT_MONO, FONT_SERIF, SECTION_LABEL, DIVIDER, EXT_TO_LANG, LANG_COLORS, formatAge, getDocIcon, gitBadgeFor, gitStateLabel } from '../constants'
+import GraphView from './GraphView'
 
 const COLLAPSED_KEY = 'vibe-dashboard-collapsed'
 const PINNED_KEY    = 'vibe-dashboard-pinned'
@@ -108,7 +109,11 @@ function OrphanDocsSection({ paths, onFileOpen, rootPath }) {
   )
 }
 
-function ProjectDashboard({ data, recentChanges, brokenLinks, orphanDocs, onFileOpen, onRefresh, refreshing, justRefreshed, gitInfo }) {
+function ProjectDashboard({ data, recentChanges, brokenLinks, orphanDocs, graphData, onFileOpen, onRefresh, refreshing, justRefreshed, gitInfo }) {
+  const handleGraphNodeClick = useCallback((absPath) => {
+    onFileOpen({ path: absPath, name: absPath.split('/').pop(), isDirectory: false })
+  }, [onFileOpen])
+
   const [collapsed, setCollapsed] = useState(loadCollapsed)
   const [pinned, setPinned] = useState(loadPinned)
 
@@ -185,6 +190,15 @@ function ProjectDashboard({ data, recentChanges, brokenLinks, orphanDocs, onFile
           <StatCard value={totalDocs} label="Docs" />
         </div>
       </div>
+
+      {graphData && graphData.nodes.length > 1 && (
+        <div>
+          <div style={SECTION_LABEL}>Link Graph ({graphData.nodes.length})</div>
+          <div style={{ height:'360px', background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'8px', overflow:'hidden', position:'relative' }}>
+            <GraphView data={graphData} onNodeClick={handleGraphNodeClick} />
+          </div>
+        </div>
+      )}
 
       {langStats.length > 0 && (
         <div>

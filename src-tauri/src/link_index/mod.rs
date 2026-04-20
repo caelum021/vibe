@@ -41,6 +41,29 @@ pub struct BrokenLink {
     pub kind: LinkKind,
 }
 
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct GraphNode {
+    pub id: String,
+    pub label: String,
+    pub is_orphan: bool,
+    pub depth: u32,
+}
+
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct GraphEdge {
+    pub source: String,
+    pub target: String,
+}
+
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct GraphData {
+    pub nodes: Vec<GraphNode>,
+    pub edges: Vec<GraphEdge>,
+}
+
 #[derive(Debug, Clone)]
 struct LinkEdge {
     target: Option<PathBuf>,
@@ -186,25 +209,78 @@ impl LinkGraph {
 
     pub fn orphans(&self) -> Vec<String> {
         let g = self.inner.read().unwrap();
-        let mut out = Vec::new();
-        for md in g.all_md.iter() {
-            // root-level files are entry-points, not orphans
-            if let Some(ref root) = g.root {
-                if md.parent().map(|p| p == root.as_path()).unwrap_or(false) {
-                    continue;
-                }
-            }
-            let referenced = g
-                .incoming
-                .get(md)
-                .map(|list| list.iter().any(|b| &b.source != md))
-                .unwrap_or(false);
-            if !referenced {
-                out.push(md.to_string_lossy().into_owned());
-            }
-        }
+        let mut out: Vec<String> = g
+            .all_md
+            .iter()
+            .filter(|md| is_orphan_inner(&g, md))
+            .map(|md| md.to_string_lossy().into_owned())
+            .collect();
         out.sort();
         out
+    }
+
+    pub fn graph_data(&self) -> GraphData {
+        const NODE_CAP: usize = 200;
+        let g = self.inner.read().unwrap();
+        let root = g.root.as_ref();
+
+        let mut md_paths: Vec<&PathBuf> = g.all_md.iter().collect();
+        md_paths.sort();
+        md_paths.truncate(NODE_CAP);
+
+        let depth_of = |md: &PathBuf| -> u32 {
+            root.and_then(|r| md.strip_prefix(r).ok())
+                .and_then(|rel| rel.parent())
+                .map(|p| p.components().count() as u32)
+                .unwrap_or(0)
+        };
+
+        let nodes: Vec<GraphNode> = md_paths
+            .iter()
+            .map(|p| GraphNode {
+                id: p.to_string_lossy().into_owned(),
+                label: p
+                    .file_name()
+                    .map(|n| n.to_string_lossy().into_owned())
+                    .unwrap_or_default(),
+                is_orphan: is_orphan_inner(&g, p),
+                depth: depth_of(p),
+            })
+            .collect();
+
+        let node_id_set: HashSet<String> = nodes.iter().map(|n| n.id.clone()).collect();
+
+        let mut edges: Vec<GraphEdge> = Vec::new();
+        for (source, edge_list) in g.outgoing.iter() {
+            let src_str = source.to_string_lossy().into_owned();
+            if !node_id_set.contains(&src_str) {
+                continue;
+            }
+            for e in edge_list {
+                if e.is_external {
+                    continue;
+                }
+                let Some(ref t) = e.target else { continue };
+                if !is_md(t) {
+                    continue;
+                }
+                if source == t {
+                    continue;
+                }
+                let tgt_str = t.to_string_lossy().into_owned();
+                if !node_id_set.contains(&tgt_str) {
+                    continue;
+                }
+                edges.push(GraphEdge {
+                    source: src_str.clone(),
+                    target: tgt_str,
+                });
+            }
+        }
+        edges.sort_by(|a, b| a.source.cmp(&b.source).then(a.target.cmp(&b.target)));
+        edges.dedup_by(|a, b| a.source == b.source && a.target == b.target);
+
+        GraphData { nodes, edges }
     }
 
     pub fn build_sync(&self) {
@@ -226,6 +302,18 @@ pub fn is_md(path: &Path) -> bool {
     path.extension()
         .and_then(|e| e.to_str())
         .map(|e| e.eq_ignore_ascii_case("md") || e.eq_ignore_ascii_case("markdown"))
+        .unwrap_or(false)
+}
+
+fn is_orphan_inner(g: &GraphInner, md: &PathBuf) -> bool {
+    if let Some(ref root) = g.root {
+        if md.parent().map(|p| p == root.as_path()).unwrap_or(false) {
+            return false;
+        }
+    }
+    !g.incoming
+        .get(md)
+        .map(|list| list.iter().any(|b| &b.source != md))
         .unwrap_or(false)
 }
 

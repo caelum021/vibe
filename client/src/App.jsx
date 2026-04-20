@@ -134,6 +134,7 @@ function App() {
   const [dashboardData, setDashboardData]       = useState(null)
   const [brokenLinks, setBrokenLinks]           = useState([])
   const [orphanDocs, setOrphanDocs]             = useState([])
+  const [graphData, setGraphData]               = useState(null)
   const [projects, setProjects]                 = useState(() => loadProjects())
   const [gitInfo, setGitInfo]                   = useState({ isRepo: false, branch: null, filesByAbs: new Map(), dirtyCount: 0 })
   const [refreshing, setRefreshing]             = useState(false)
@@ -265,9 +266,14 @@ function App() {
 
   const loadLinkHealth = useCallback(async () => {
     try {
-      const [broken, orphans] = await Promise.all([api.getBrokenLinks(), api.getOrphanDocs()])
+      const [broken, orphans, graph] = await Promise.all([
+        api.getBrokenLinks(),
+        api.getOrphanDocs(),
+        api.getGraphData(),
+      ])
       setBrokenLinks(broken || [])
       setOrphanDocs(orphans || [])
+      setGraphData(graph || null)
     } catch (e) { console.error('Link health load failed:', e) }
   }, [])
 
@@ -422,7 +428,7 @@ function App() {
     setSelectedFile(null); setFileContent(''); setIsEditing(false); setEditContent('')
     setChangedFiles(new Set()); setRecentChanges([])
     setDashboardData(null)
-    setBrokenLinks([]); setOrphanDocs([])
+    setBrokenLinks([]); setOrphanDocs([]); setGraphData(null)
     setNav({ stack: [], index: -1 })
     navScrollsRef.current = []
     setGitInfo({ isRepo: false, branch: null, filesByAbs: new Map(), dirtyCount: 0 })
@@ -566,7 +572,7 @@ function App() {
             </div>
           ) : (
             <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-              <ProjectDashboard data={dashboardData} recentChanges={recentChanges} brokenLinks={brokenLinks} orphanDocs={orphanDocs} onFileOpen={handleFileSelect} onRefresh={refreshAll} refreshing={refreshing} justRefreshed={justRefreshed} gitInfo={gitInfo} />
+              <ProjectDashboard data={dashboardData} recentChanges={recentChanges} brokenLinks={brokenLinks} orphanDocs={orphanDocs} graphData={graphData} onFileOpen={handleFileSelect} onRefresh={refreshAll} refreshing={refreshing} justRefreshed={justRefreshed} gitInfo={gitInfo} />
             </div>
           )}
         </div>
