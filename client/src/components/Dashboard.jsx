@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react'
+import { memo, useState, useCallback, useMemo } from 'react'
 import { FONT_MONO, FONT_SERIF, SECTION_LABEL, DIVIDER, EXT_TO_LANG, LANG_COLORS, formatAge, getDocIcon, gitBadgeFor, gitStateLabel } from '../constants'
 
 const COLLAPSED_KEY = 'vibe-dashboard-collapsed'
@@ -18,30 +18,27 @@ function StatCard({ value, label }) {
 }
 
 function DocItem({ doc, gitInfo, isPinned, onTogglePin, onFileOpen }) {
-  const [hovered, setHovered] = useState(false)
   const icon = getDocIcon(doc.name)
   const gitState = gitInfo?.filesByAbs?.get(doc.path)
   const badge = gitBadgeFor(gitState)
   return (
     <div
+      className="dash-row dash-doc"
       onClick={() => onFileOpen(doc)}
       draggable onDragStart={e => { e.dataTransfer.setData('text/plain', doc.path); e.dataTransfer.effectAllowed = 'copy' }}
-      onMouseEnter={e => { setHovered(true); e.currentTarget.style.background = 'var(--accent-sub)'; e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--accent) 20%, transparent)' }}
-      onMouseLeave={e => { setHovered(false); e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'transparent' }}
-      style={{ display:'flex', alignItems:'center', gap:'8px', padding:'6px 8px', borderRadius:'6px', cursor:'pointer', border:'1px solid transparent', transition:'background 75ms, border-color 75ms' }}>
+      style={{ display:'flex', alignItems:'center', gap:'8px', padding:'6px 8px', cursor:'pointer' }}>
       <span style={{ fontSize:'14px', width:'20px', textAlign:'center', flexShrink:0, color:'var(--muted)' }}>{icon}</span>
       <div style={{ flex:1, minWidth:0 }}>
         <div style={{ fontSize:'13px', fontWeight:500, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{doc.name}</div>
         {doc.desc && <div style={{ fontSize:'11px', color:'var(--muted)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{doc.desc}</div>}
       </div>
-      {(hovered || isPinned) && (
-        <button
-          onClick={e => { e.stopPropagation(); onTogglePin(doc.path) }}
-          title={isPinned ? 'Unpin' : 'Pin'}
-          style={{ background:'none', border:'none', cursor:'pointer', padding:'0 2px', color: isPinned ? '#E8B84B' : 'var(--muted)', fontSize:'11px', flexShrink:0, lineHeight:1, opacity: isPinned ? 1 : 0.5 }}>
-          {isPinned ? '◆' : '◇'}
-        </button>
-      )}
+      <button
+        className={`dash-pin${isPinned ? ' pinned' : ''}`}
+        onClick={e => { e.stopPropagation(); onTogglePin(doc.path) }}
+        title={isPinned ? 'Unpin' : 'Pin'}
+        style={{ background:'none', border:'none', cursor:'pointer', padding:'0 2px', fontSize:'11px', flexShrink:0, lineHeight:1 }}>
+        {isPinned ? '◆' : '◇'}
+      </button>
       {badge && (
         <span title={gitStateLabel(gitState)} style={{ fontFamily:FONT_MONO, fontSize:'12px', color:badge.color, flexShrink:0, width:'12px', textAlign:'center', lineHeight:1 }}>{badge.glyph}</span>
       )}
@@ -69,10 +66,9 @@ function BrokenLinksSection({ items, onFileOpen, rootPath }) {
           {items.map((b, i) => (
             <div
               key={`${b.source}:${b.line}:${i}`}
+              className="dash-row"
               onClick={() => onFileOpen({ path: b.source, name: b.source.split('/').pop(), isDirectory: false })}
-              onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-2)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-              style={{ padding:'6px 8px', borderRadius:'6px', cursor:'pointer', transition:'background 75ms', borderLeft:'2px solid var(--error)' }}>
+              style={{ padding:'6px 8px', cursor:'pointer', borderLeft:'2px solid var(--error)' }}>
               <div style={{ display:'flex', alignItems:'center', gap:'6px' }}>
                 <span style={{ fontFamily:FONT_MONO, fontSize:'11.5px', color:'var(--accent)' }}>{relPathFrom(b.source, rootPath)}</span>
                 <span style={{ fontFamily:FONT_MONO, fontSize:'11px', color:'var(--muted)' }}>:{b.line}</span>
@@ -100,10 +96,9 @@ function OrphanDocsSection({ paths, onFileOpen, rootPath }) {
           {paths.map((p) => (
             <div
               key={p}
+              className="dash-row dash-orphan"
               onClick={() => onFileOpen({ path: p, name: p.split('/').pop(), isDirectory: false })}
-              onMouseEnter={e => { e.currentTarget.style.background = 'var(--surface-2)'; e.currentTarget.style.color = 'var(--accent)' }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--muted)' }}
-              style={{ fontFamily:FONT_MONO, fontSize:'12px', color:'var(--muted)', padding:'5px 8px', borderRadius:'6px', cursor:'pointer', transition:'background 75ms, color 75ms', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+              style={{ fontFamily:FONT_MONO, fontSize:'12px', padding:'5px 8px', cursor:'pointer', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
               {relPathFrom(p, rootPath)}
             </div>
           ))}
@@ -113,7 +108,7 @@ function OrphanDocsSection({ paths, onFileOpen, rootPath }) {
   )
 }
 
-export default function ProjectDashboard({ data, recentChanges, brokenLinks, orphanDocs, onFileOpen, onRefresh, refreshing, justRefreshed, gitInfo }) {
+function ProjectDashboard({ data, recentChanges, brokenLinks, orphanDocs, onFileOpen, onRefresh, refreshing, justRefreshed, gitInfo }) {
   const [collapsed, setCollapsed] = useState(loadCollapsed)
   const [pinned, setPinned] = useState(loadPinned)
 
@@ -260,11 +255,9 @@ export default function ProjectDashboard({ data, recentChanges, brokenLinks, orp
                 const gitState = gitInfo?.filesByAbs?.get(item.path)
                 const badge = gitBadgeFor(gitState)
                 return (
-                  <div key={item.path + i} onClick={() => onFileOpen(item)}
+                  <div key={item.path + i} className="dash-row" onClick={() => onFileOpen(item)}
                     draggable onDragStart={e => { e.dataTransfer.setData('text/plain', item.path); e.dataTransfer.effectAllowed = 'copy' }}
-                    onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-2)'}
-                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                    style={{ display:'flex', alignItems:'center', gap:'8px', padding:'5px 8px', borderRadius:'6px', cursor:'pointer', transition:'background 75ms' }}>
+                    style={{ display:'flex', alignItems:'center', gap:'8px', padding:'5px 8px', cursor:'pointer' }}>
                     <span style={{ width:'6px', height:'6px', borderRadius:'50%', background:dotColor, flexShrink:0 }} />
                     <span style={{ fontSize:'13px', color:'var(--text)', flex:1 }}>{item.name}</span>
                     {badge && (
@@ -284,3 +277,5 @@ export default function ProjectDashboard({ data, recentChanges, brokenLinks, orp
     </div>
   )
 }
+
+export default memo(ProjectDashboard)

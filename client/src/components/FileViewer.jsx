@@ -10,6 +10,15 @@ import MarkdownView from './MarkdownView'
 import BacklinksPanel from './BacklinksPanel'
 import { resolveKey, LINE_HEIGHT_PX, EDIT_PADDING_PX, LINE_NUM_WIDTH, FONT_MONO, FONT_UI, EXT_TO_DISPLAY } from '../constants'
 
+const NavBtn = ({ onClick, enabled, title, label, glyph }) => (
+  <button onClick={onClick} disabled={!enabled} title={title} aria-label={label}
+    onMouseEnter={e => { if (enabled) e.currentTarget.style.color = 'var(--accent)' }}
+    onMouseLeave={e => { if (enabled) e.currentTarget.style.color = 'var(--muted)' }}
+    style={{ background:'none', border:'none', color: enabled ? 'var(--muted)' : 'var(--border)', cursor: enabled ? 'pointer' : 'default', fontSize:'18px', lineHeight:1, padding:'0 6px', opacity: enabled ? 1 : 0.35, fontFamily: FONT_UI, transition:'color 150ms' }}>
+    {glyph}
+  </button>
+)
+
 const FileViewer = ({
   selectedFile, content, isEditing, editContent, isDirty, isMd, isDark,
   onEditContentChange, onEnterEdit, onExitEdit, onSave,
@@ -17,6 +26,8 @@ const FileViewer = ({
   gitDirty, diffMode, onEnterDiff, onExitDiff,
   externallyChanged, onReload, openSearchRef, closeSearchRef,
   rootPath, onLinkOpen,
+  onBack, onForward, canBack, canForward,
+  initialScroll, onScrollChange,
 }) => {
   const [mdTab, setMdTab] = useState('edit')
   const [diffData, setDiffData] = useState(null)
@@ -31,6 +42,8 @@ const FileViewer = ({
   const lineNumbersRef    = useRef(null)
   const searchInputRef    = useRef(null)
   const listRef           = useRef(null)
+  const scrollContainerRef = useRef(null)
+  const pendingScrollRef  = useRef(null)
   const lastViewScrollRef = useRef(null)  // { type:'code', line } | { type:'md', ratio }
   const ext = selectedFile?.name.split('.').pop()?.toLowerCase() ?? ''
   const langBadge = EXT_TO_DISPLAY[ext] || ext || '—'
@@ -132,7 +145,37 @@ const FileViewer = ({
     })
   }, [content])
 
-  useEffect(() => { setMdTab('edit'); setDiffData(null); setDiffError(''); setDiffSideBySide(false); closeSearch(); lastViewScrollRef.current = null }, [selectedFile])
+  useEffect(() => {
+    setMdTab('edit'); setDiffData(null); setDiffError(''); setDiffSideBySide(false); closeSearch()
+    lastViewScrollRef.current = null
+    pendingScrollRef.current = initialScroll ?? { type: 'top' }
+  }, [selectedFile])
+
+  useEffect(() => {
+    if (!pendingScrollRef.current || !selectedFile || !content) return
+    if (isEditing || diffMode) return
+    const pending = pendingScrollRef.current
+    pendingScrollRef.current = null
+    const apply = () => {
+      if (isMd) {
+        const el = scrollContainerRef.current
+        if (!el) return
+        if (pending.type === 'md') {
+          const denom = el.scrollHeight - el.clientHeight
+          el.scrollTop = denom > 0 ? Math.round(pending.ratio * denom) : 0
+        } else {
+          el.scrollTop = 0
+        }
+      } else {
+        if (!listRef.current) return
+        const idx = pending.type === 'code' ? pending.line : 0
+        listRef.current.scrollToRow({ index: idx, align: 'start' })
+      }
+    }
+    // Markdown needs an extra frame — content mounts then scrollHeight resolves.
+    if (isMd) requestAnimationFrame(() => requestAnimationFrame(apply))
+    else requestAnimationFrame(apply)
+  }, [content, selectedFile, isMd, isEditing, diffMode])
 
   // Order matters: scrollTop MUST be set before focus. focus() triggers the browser's
   // auto-scroll-to-caret which otherwise clobbers our target. preventScroll is a
@@ -159,12 +202,16 @@ const FileViewer = ({
     const el = e.currentTarget
     const denom = el.scrollHeight - el.clientHeight
     const ratio = denom > 0 ? Math.max(0, Math.min(1, el.scrollTop / denom)) : 0
-    lastViewScrollRef.current = { type: 'md', ratio }
-  }, [])
+    const data = { type: 'md', ratio }
+    lastViewScrollRef.current = data
+    onScrollChange?.(data)
+  }, [onScrollChange])
 
   const handleRowsRendered = useCallback(({ startIndex }) => {
-    lastViewScrollRef.current = { type: 'code', line: startIndex }
-  }, [])
+    const data = { type: 'code', line: startIndex }
+    lastViewScrollRef.current = data
+    onScrollChange?.(data)
+  }, [onScrollChange])
 
   // Fetch diff when entering diff mode (or when file re-changes while already in diff).
   useEffect(() => {
@@ -193,7 +240,7 @@ const FileViewer = ({
   useEffect(() => {
     if (!isEditing || !isMd) return
     const handle = (e) => {
-      if (e.ctrlKey && resolveKey(e.key) === 'p') { e.preventDefault(); setMdTab(p => p === 'edit' ? 'preview' : 'edit') }
+      if ((e.metaKey || e.ctrlKey) && resolveKey(e.key) === 'p') { e.preventDefault(); setMdTab(p => p === 'edit' ? 'preview' : 'edit') }
     }
     window.addEventListener('keydown', handle)
     return () => window.removeEventListener('keydown', handle)
@@ -205,8 +252,8 @@ const FileViewer = ({
       const s = e.target.selectionStart, end = e.target.selectionEnd
       onEditContentChange(editContent.slice(0, s) + '  ' + editContent.slice(end))
       requestAnimationFrame(() => { if (textareaRef.current) { textareaRef.current.selectionStart = s + 2; textareaRef.current.selectionEnd = s + 2 } })
-    } else if (e.ctrlKey && resolveKey(e.key) === 's') { e.preventDefault(); onSave() }
-    else if (e.ctrlKey && resolveKey(e.key) === 'w') { e.preventDefault(); setWrapEnabled(w => !w) }
+    } else if ((e.metaKey || e.ctrlKey) && resolveKey(e.key) === 's') { e.preventDefault(); onSave() }
+    else if (e.altKey && resolveKey(e.key) === 'z') { e.preventDefault(); setWrapEnabled(w => !w) }
     else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); onExitEdit() }
   }, [editContent, onEditContentChange, onSave, onExitEdit])
 
@@ -253,6 +300,10 @@ const FileViewer = ({
     <div ref={innerRef} tabIndex={0} onFocus={onFocus} style={{ display:'flex', flexDirection:'column', height:'100%', outline:'none', background:'var(--surface)' }}>
       {/* Header */}
       <div style={{ height:'34px', minHeight:'34px', borderBottom:'1px solid var(--border)', display:'flex', alignItems:'center', padding:'0 16px', gap:'16px', flexShrink:0 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:'2px', flexShrink:0, marginRight:'-8px' }}>
+          <NavBtn onClick={onBack}    enabled={canBack}    title="Back (⌘[ or ⌘←)"    label="Back"    glyph="‹" />
+          <NavBtn onClick={onForward} enabled={canForward} title="Forward (⌘] or ⌘→)" label="Forward" glyph="›" />
+        </div>
         <span style={{ fontSize:'13px', fontWeight:500, color: isDirty ? 'var(--accent)' : 'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', transition:'color 150ms' }}>
           {selectedFile?.name}{isDirty ? ' *' : ''}
         </span>
@@ -341,7 +392,7 @@ const FileViewer = ({
       )}
 
       {/* Content — code viewer & edit pane fill via flex; markdown flows in scroll container. */}
-      <div data-scroll-container onScroll={isMd && !isEditing ? handleMdScroll : undefined} style={{ flex:1, overflow: isFlexLayout ? 'hidden' : 'auto', padding: isFlexLayout ? '0' : isMd ? '24px 32px' : '0', display: isFlexLayout ? 'flex' : 'block', flexDirection:'column', minHeight:0 }}>
+      <div ref={scrollContainerRef} data-scroll-container onScroll={isMd && !isEditing ? handleMdScroll : undefined} style={{ flex:1, overflow: isFlexLayout ? 'hidden' : 'auto', padding: isFlexLayout ? '0' : isMd ? '24px 32px' : '0', display: isFlexLayout ? 'flex' : 'block', flexDirection:'column', minHeight:0 }}>
         {selectedFile && (
           showDiff ? (
             diffError ? <div style={{ padding:'24px', color:'var(--error)', fontFamily:FONT_MONO, fontSize:'12px', whiteSpace:'pre-wrap' }}>Diff failed: {diffError}</div>

@@ -138,8 +138,14 @@ function App() {
   const [gitInfo, setGitInfo]                   = useState({ isRepo: false, branch: null, filesByAbs: new Map(), dirtyCount: 0 })
   const [refreshing, setRefreshing]             = useState(false)
   const [justRefreshed, setJustRefreshed]       = useState(false)
+  const [nav, setNav]                           = useState({ stack: [], index: -1 })
+  const navRef                                  = useRef({ stack: [], index: -1 })
+  const navScrollsRef                           = useRef([])
+  const goBackRef                               = useRef(null)
+  const goForwardRef                            = useRef(null)
   const gitRefetchTimerRef                      = useRef(null)
   const dashboardRefetchTimerRef                = useRef(null)
+  navRef.current = nav
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme === 'dark' ? 'dark' : '')
@@ -282,8 +288,32 @@ function App() {
   const executeAction = useCallback((action) => {
     setPendingAction(null); setIsEditing(false)
     switch (action.type) {
-      case 'close': setSelectedFile(null); setFileContent(''); setExternallyChanged(false); handleFocusChange('explorer'); break
-      case 'changeFile': setSelectedFile(action.file); setChangedFiles(prev => { const n = new Set(prev); n.delete(action.file.path); return n }); setExternallyChanged(false); handleFocusChange('viewer'); break
+      case 'close':
+        setSelectedFile(null); setFileContent(''); setExternallyChanged(false)
+        setNav({ stack: [], index: -1 })
+        navScrollsRef.current = []
+        handleFocusChange('explorer')
+        break
+      case 'changeFile':
+        setSelectedFile(action.file)
+        setChangedFiles(prev => { const n = new Set(prev); n.delete(action.file.path); return n })
+        setExternallyChanged(false)
+        handleFocusChange('viewer')
+        if (action.fromHistory) {
+          setNav(prev => ({ ...prev, index: action.newIndex }))
+        } else if (action.resetHistory) {
+          setNav({ stack: [action.file], index: 0 })
+          navScrollsRef.current = []
+        } else {
+          setNav(prev => {
+            const top = prev.index >= 0 ? prev.stack[prev.index] : null
+            if (top?.path === action.file.path) return prev
+            const truncated = prev.stack.slice(0, prev.index + 1)
+            navScrollsRef.current = navScrollsRef.current.slice(0, truncated.length)
+            return { stack: [...truncated, action.file], index: truncated.length }
+          })
+        }
+        break
       case 'exitEdit':
         if (externallyChangedRef.current) {
           setExternallyChanged(false)
@@ -303,7 +333,28 @@ function App() {
   }, [executeAction])
   requireCleanRef.current = requireClean
 
-  const handleFileSelect       = useCallback((file) => requireClean({ type:'changeFile', file }), [requireClean])
+  const handleFileSelect       = useCallback((file) => requireClean({ type:'changeFile', file, resetHistory: true }), [requireClean])
+  const handleLinkOpen         = useCallback((file) => requireClean({ type:'changeFile', file }), [requireClean])
+  const handleScrollChange     = useCallback((data) => {
+    const idx = navRef.current.index
+    if (idx >= 0) navScrollsRef.current[idx] = data
+  }, [])
+  const goBack                 = useCallback(() => {
+    if (!selectedFileRef.current) return
+    const { stack, index } = navRef.current
+    if (index <= 0) return
+    const newIdx = index - 1
+    requireCleanRef.current({ type:'changeFile', file: stack[newIdx], fromHistory: true, newIndex: newIdx })
+  }, [])
+  const goForward              = useCallback(() => {
+    if (!selectedFileRef.current) return
+    const { stack, index } = navRef.current
+    if (index >= stack.length - 1) return
+    const newIdx = index + 1
+    requireCleanRef.current({ type:'changeFile', file: stack[newIdx], fromHistory: true, newIndex: newIdx })
+  }, [])
+  goBackRef.current    = goBack
+  goForwardRef.current = goForward
   const toggleSidebar          = useCallback(() => setSidebarVisible(p => !p), [])
   const enterEditMode          = useCallback(() => { setDiffMode(false); setEditContent(fileContentRef.current); setIsEditing(true) }, [])
   const enterDiffMode          = useCallback(() => setDiffMode(true), [])
@@ -372,6 +423,8 @@ function App() {
     setChangedFiles(new Set()); setRecentChanges([])
     setDashboardData(null)
     setBrokenLinks([]); setOrphanDocs([])
+    setNav({ stack: [], index: -1 })
+    navScrollsRef.current = []
     setGitInfo({ isRepo: false, branch: null, filesByAbs: new Map(), dirtyCount: 0 })
     setRootPath(path)
     getCurrentWindow().setTitle(`vibe. — ${basenameOf(path)}`)
@@ -439,16 +492,23 @@ function App() {
   useEffect(() => {
     const handle = (e) => {
       const key = resolveKey(e.key)
-      if (e.ctrlKey && key === 'b') { e.preventDefault(); toggleSidebar() }
-      else if (e.ctrlKey && e.shiftKey && key === 'l') { e.preventDefault(); setTheme(t => t === 'dark' ? 'light' : 'dark') }
-      else if ((e.metaKey || e.ctrlKey) && key >= '1' && key <= '9') {
+      const mod = e.metaKey || e.ctrlKey
+      if (mod && key === 'b') { e.preventDefault(); toggleSidebar() }
+      else if (mod && e.shiftKey && key === 'l') { e.preventDefault(); setTheme(t => t === 'dark' ? 'light' : 'dark') }
+      else if (mod && key >= '1' && key <= '9') {
         const idx = parseInt(key) - 1
         if (idx < projects.length && projects[idx].path !== rootPath) { e.preventDefault(); switchProject(projects[idx].path) }
       }
       else if (e.key === '?' && !e.target?.matches('input,textarea,[contenteditable]')) { e.preventDefault(); setAboutOpen(a => !a) }
       else if (e.key === 'Escape') { e.preventDefault(); handleEscapeKeyRef.current() }
-      else if (e.ctrlKey && key === 'r') { e.preventDefault(); refreshAll() }
-      else if (e.ctrlKey && key === 'f' && activeFocusRef.current === 'viewer' && selectedFileRef.current && !isEditingRef.current) { e.preventDefault(); openSearchRef.current?.() }
+      else if (mod && key === 'r') { e.preventDefault(); refreshAll() }
+      else if (mod && key === 'f' && activeFocusRef.current === 'viewer' && selectedFileRef.current && !isEditingRef.current) { e.preventDefault(); openSearchRef.current?.() }
+      else if (mod && (e.key === '[' || e.key === ']' || e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+        const t = e.target
+        if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
+        e.preventDefault()
+        if (e.key === '[' || e.key === 'ArrowLeft') goBackRef.current?.(); else goForwardRef.current?.()
+      }
       else if (activeFocusRef.current === 'viewer' && handleViewerKeyRef.current?.(e)) { /* handled */ }
     }
     window.addEventListener('keydown', handle)
@@ -502,7 +562,7 @@ function App() {
         <div style={{ display:'flex', flex:1, overflow:'hidden', background:'var(--surface)' }}>
           {selectedFile ? (
             <div style={{ flex:1, minWidth:'40%', overflow:'hidden' }}>
-              <FileViewer innerRef={viewerRef} onFocus={focusViewer} onClose={closeViewer} onEnterEdit={enterEditMode} onExitEdit={exitEditMode} onSave={saveFile} onEditContentChange={setEditContent} selectedFile={selectedFile} content={fileContent} isEditing={isEditing} editContent={editContent} isDirty={isDirty} isMd={isMd} isDark={isDark} isFocused={activeFocus === 'viewer'} gitDirty={gitDirty} diffMode={diffMode} onEnterDiff={enterDiffMode} onExitDiff={exitDiffMode} externallyChanged={externallyChanged} onReload={reloadCurrentFile} openSearchRef={openSearchRef} closeSearchRef={closeSearchRef} rootPath={rootPath} onLinkOpen={handleFileSelect} />
+              <FileViewer innerRef={viewerRef} onFocus={focusViewer} onClose={closeViewer} onEnterEdit={enterEditMode} onExitEdit={exitEditMode} onSave={saveFile} onEditContentChange={setEditContent} selectedFile={selectedFile} content={fileContent} isEditing={isEditing} editContent={editContent} isDirty={isDirty} isMd={isMd} isDark={isDark} isFocused={activeFocus === 'viewer'} gitDirty={gitDirty} diffMode={diffMode} onEnterDiff={enterDiffMode} onExitDiff={exitDiffMode} externallyChanged={externallyChanged} onReload={reloadCurrentFile} openSearchRef={openSearchRef} closeSearchRef={closeSearchRef} rootPath={rootPath} onLinkOpen={handleLinkOpen} onBack={goBack} onForward={goForward} canBack={nav.index > 0} canForward={nav.index >= 0 && nav.index < nav.stack.length - 1} initialScroll={navScrollsRef.current[nav.index]} onScrollChange={handleScrollChange} />
             </div>
           ) : (
             <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
@@ -515,11 +575,19 @@ function App() {
       {/* Footer */}
       <div style={{ height:'22px', background:'var(--bg)', borderTop:'1px solid var(--border)', display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 16px', flexShrink:0 }}>
         <div style={{ display:'flex', gap:'14px', overflow:'hidden' }}>
-          {footerShortcuts.map(([key, desc]) => (
-            <span key={key} style={{ display:'flex', alignItems:'center', gap:'3px', fontSize:'10.5px', color:'var(--muted)', whiteSpace:'nowrap' }}>
-              <kbd style={{ fontFamily:FONT_MONO, fontSize:'10px', color:'var(--text)', fontStyle:'normal' }}>{key}</kbd> {desc}
-            </span>
-          ))}
+          {footerShortcuts.map(([key, desc]) => {
+            const m = key.match(/^([\u2318\u2325\u2303\u21e7]+)(.*)$/)
+            return (
+              <span key={key} style={{ display:'flex', alignItems:'center', gap:'3px', fontSize:'10.5px', color:'var(--muted)', whiteSpace:'nowrap' }}>
+                <kbd style={{ fontFamily:FONT_MONO, fontSize:'10px', color:'var(--text)', fontStyle:'normal', display:'inline-flex', alignItems:'baseline' }}>
+                  {m ? (<>
+                    <span style={{ fontFamily:FONT_UI, fontSize:'11px', marginRight: m[2] ? '2px' : 0 }}>{m[1]}</span>
+                    {m[2]}
+                  </>) : key}
+                </kbd> {desc}
+              </span>
+            )
+          })}
         </div>
         <div style={{ display:'flex', alignItems:'center', gap:'8px', flexShrink:0 }}>
           {projects.length > 1 && (
@@ -529,7 +597,7 @@ function App() {
             onMouseEnter={e => { e.currentTarget.style.background='var(--surface)'; e.currentTarget.style.color='var(--text)' }}
             onMouseLeave={e => { e.currentTarget.style.background='none'; e.currentTarget.style.color='var(--muted)' }}
             style={{ background:'none', border:'1px solid var(--border)', color:'var(--muted)', borderRadius:'4px', padding:'1px 6px', fontSize:'11px', cursor:'pointer', transition:'all 150ms' }}>+</button>
-          <button onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} title="Ctrl+Shift+L"
+          <button onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} title="⌘⇧L"
             onMouseEnter={e => { e.currentTarget.style.background='var(--surface)'; e.currentTarget.style.color='var(--text)' }}
             onMouseLeave={e => { e.currentTarget.style.background='none'; e.currentTarget.style.color='var(--muted)' }}
             style={{ background:'none', border:'1px solid var(--border)', color:'var(--muted)', borderRadius:'4px', padding:'2px 8px', fontSize:'10px', cursor:'pointer', fontFamily:FONT_UI, transition:'all 150ms' }}>

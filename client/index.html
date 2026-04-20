@@ -68,6 +68,22 @@
         transform: translateX(0);
         pointer-events: auto;
       }
+      /* Dashboard row hovers — CSS-only to keep mousemove cheap */
+      .dash-row {
+        border: 1px solid transparent;
+        border-radius: 6px;
+        transition: background 75ms, border-color 75ms, color 75ms;
+      }
+      .dash-row:hover                { background: var(--surface-2); }
+      .dash-row.dash-doc:hover       { background: var(--accent-sub); border-color: color-mix(in srgb, var(--accent) 20%, transparent); }
+      .dash-row.dash-orphan          { color: var(--muted); }
+      .dash-row.dash-orphan:hover    { color: var(--accent); }
+      .dash-pin { opacity: 0; transition: opacity 100ms; }
+      .dash-row:hover .dash-pin,
+      .dash-pin.pinned { opacity: 1; }
+      .dash-pin:not(.pinned) { opacity: 0; color: var(--muted); }
+      .dash-row:hover .dash-pin:not(.pinned) { opacity: 0.5; }
+      .dash-pin.pinned { color: #E8B84B; }
       *, *::before, *::after { box-sizing: border-box; }
       body, html, #root {
         margin: 0; padding: 0;
