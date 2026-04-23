@@ -66,11 +66,15 @@ export const gitStateLabel = (state) => GIT_STATE_LABELS[state] ?? state ?? ''
 export const formatReadError = (err) => {
   const msg = String(err?.message ?? err ?? '')
   if (/too large/i.test(msg)) {
-    return '⚠ This file is larger than 1MB and cannot be displayed.\n\nVibe limits in-app file viewing to 1MB to keep the UI responsive.\nOpen it in a dedicated editor instead.'
+    return '⚠ This file is larger than 2MB and cannot be displayed.\n\nVibe limits in-app file viewing to 2MB to keep the UI responsive.\nOpen it in a dedicated editor instead.'
   }
   if (/binary/i.test(msg)) return '⚠ Binary file — not displayed.'
   return `Error loading file content.\n\n${msg}`
 }
+
+// Above this threshold, skip syntax highlighting — prism tokenizes synchronously
+// for the whole file, so a 2MB JSON would freeze the UI for seconds.
+export const HIGHLIGHT_SIZE_LIMIT = 1024 * 1024
 
 export const RECENT_CHANGES_LIMIT = 5
 export const isHiddenFile = (f) => f.name.startsWith('.') || f.parentDir?.startsWith('.') || /\.tmp\.\d+/.test(f.name)

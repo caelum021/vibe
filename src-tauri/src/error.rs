@@ -6,7 +6,7 @@ pub enum AppError {
     AccessDenied,
     #[error("Root not set — open a folder first")]
     NoRootSet,
-    #[error("File too large (>1MB)")]
+    #[error("File too large (>2MB)")]
     FileTooLarge,
     #[error("Binary file")]
     BinaryFile,

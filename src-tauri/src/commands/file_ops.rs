@@ -6,7 +6,7 @@ use serde::Serialize;
 use std::path::{Path, PathBuf};
 use tauri::State;
 
-const MAX_FILE_SIZE: u64 = 1024 * 1024;
+const MAX_FILE_SIZE: u64 = 2 * 1024 * 1024;
 const MAX_IMAGE_SIZE: u64 = 10 * 1024 * 1024;
 const MAX_WALK_DEPTH: u32 = 20;
 

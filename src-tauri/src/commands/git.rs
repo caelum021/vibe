@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use tauri::State;
 
-const MAX_DIFF_FILE_SIZE: u64 = 1024 * 1024;
+const MAX_DIFF_FILE_SIZE: u64 = 2 * 1024 * 1024;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
