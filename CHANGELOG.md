@@ -1,9 +1,22 @@
 # Changelog
 
-## [Unreleased]
+## [1.2.0] - 2026-05-12
+
+링크 그래프 시각화. v1.1.0에서 만든 인덱스를 대시보드 미니 그래프로 노출 — 문서 의존성을 한눈에 본다. 뷰어 한도/안정화 + 마크다운 소프트 줄바꿈 + 라이선스 전환.
+
+### Added
+- Dashboard markdown link graph — interactive force-directed graph of md↔md links; root files anchor left, deeper docs push right via depth-weighted forceX; click node to open
+- Rust command `get_graph_data` — returns nodes + edges with depth and orphan flags (200-node cap), shares `is_orphan_inner` with the Orphan Docs panel so both views stay consistent
+- Loading indicator on first file reads (centered "loading…"); OS cache hits remain instant
 
 ### Changed
-- License: MIT → Mozilla Public License 2.0 (file-level copyleft — derivative works of MPL-covered files must remain under MPL, but combining with other-licensed code in a Larger Work is allowed)
+- File / diff size cap raised 1MB → 2MB
+- Files larger than 1MB fall back to plain virtualized rows — prism tokenizes synchronously and would freeze the UI
+- Link graph excludes docs with neither incoming nor outgoing md links — already surfaced in the Orphan Docs panel; removes duplication and keeps fit-to-viewport sane
+- Graph wheel-zoom requires an explicit click first (was hijacking page scroll); Esc or cursor-leave releases. Subtle inset outline + top-right hint label marks the active state
+- Per-node collide radius computed from label width so labels no longer overlap neighbors
+- Markdown soft line wrap — single newlines render as `<br>` via remark-breaks, matching Obsidian / GitHub conventions
+- License: MIT → Mozilla Public License 2.0 (file-level copyleft; combining MPL files into a Larger Work with other-licensed code remains allowed)
 
 ## [1.1.0] - 2026-04-20
 
