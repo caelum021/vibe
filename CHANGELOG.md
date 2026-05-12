@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+- License: MIT → Mozilla Public License 2.0 (file-level copyleft — derivative works of MPL-covered files must remain under MPL, but combining with other-licensed code in a Larger Work is allowed)
+
 ## [1.1.0] - 2026-04-20
 
 마크다운 1급 시민화 — 문서 간 링크 그래프를 중심으로 편집기가 구조를 이해한다.
