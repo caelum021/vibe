@@ -89,23 +89,20 @@ function BrokenLinksSection({ items, onFileOpen, rootPath }) {
 function OrphanDocsSection({ paths, onFileOpen, rootPath }) {
   if (!paths || paths.length === 0) return null
   return (
-    <>
-      <hr style={DIVIDER} />
-      <div>
-        <div style={SECTION_LABEL}>Orphan Docs ({paths.length})</div>
-        <div style={{ display:'flex', flexDirection:'column', gap:'2px', maxHeight:'220px', overflowY:'auto' }}>
-          {paths.map((p) => (
-            <div
-              key={p}
-              className="dash-row dash-orphan"
-              onClick={() => onFileOpen({ path: p, name: p.split('/').pop(), isDirectory: false })}
-              style={{ fontFamily:FONT_MONO, fontSize:'12px', padding:'5px 8px', cursor:'pointer', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-              {relPathFrom(p, rootPath)}
-            </div>
-          ))}
-        </div>
+    <div>
+      <div style={SECTION_LABEL}>Orphan Docs ({paths.length})</div>
+      <div style={{ display:'flex', flexDirection:'column', gap:'2px', maxHeight:'220px', overflowY:'auto' }}>
+        {paths.map((p) => (
+          <div
+            key={p}
+            className="dash-row dash-orphan"
+            onClick={() => onFileOpen({ path: p, name: p.split('/').pop(), isDirectory: false })}
+            style={{ fontFamily:FONT_MONO, fontSize:'12px', padding:'5px 8px', cursor:'pointer', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+            {relPathFrom(p, rootPath)}
+          </div>
+        ))}
       </div>
-    </>
+    </div>
   )
 }
 
@@ -148,16 +145,27 @@ function ProjectDashboard({ data, recentChanges, brokenLinks, orphanDocs, graphD
         <div style={{ minWidth:0 }}>
           <div className="vibe-logo" style={{ fontSize:'26px', fontWeight:400 }}>{projectName}</div>
           <div style={{ fontFamily:FONT_MONO, fontSize:'11px', color:'var(--muted)', marginTop:'4px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{projectPath}</div>
-          {gitInfo?.isRepo && (
-            <div style={{ fontFamily:FONT_MONO, fontSize:'11px', color:'var(--muted)', marginTop:'6px', display:'flex', alignItems:'center', gap:'8px' }}>
-              <span style={{ color:'var(--text)' }}>⎇ {gitInfo.branch || '(detached)'}</span>
-              {gitInfo.dirtyCount > 0 ? (
-                <span style={{ color:'var(--accent)' }}>~ {gitInfo.dirtyCount} changed</span>
-              ) : (
-                <span>clean</span>
-              )}
-            </div>
-          )}
+          <div style={{ fontFamily:FONT_MONO, fontSize:'11px', color:'var(--muted)', marginTop:'6px', display:'flex', alignItems:'center', gap:'12px', flexWrap:'wrap' }}>
+            {gitInfo?.isRepo && (
+              <span style={{ display:'inline-flex', alignItems:'center', gap:'8px' }}>
+                <span style={{ color:'var(--text)' }}>⎇ {gitInfo.branch || '(detached)'}</span>
+                {gitInfo.dirtyCount > 0 ? (
+                  <span style={{ color:'var(--accent)' }}>~ {gitInfo.dirtyCount} changed</span>
+                ) : (
+                  <span>clean</span>
+                )}
+              </span>
+            )}
+            <span style={{ display:'inline-flex', alignItems:'center', gap:'8px' }}>
+              <span><span style={{ color:'var(--text)' }}>{totalFiles}</span> files</span>
+              <span style={{ opacity:0.4 }}>·</span>
+              <span><span style={{ color:'var(--text)' }}>{totalFolders}</span> folders</span>
+              <span style={{ opacity:0.4 }}>·</span>
+              <span><span style={{ color:'var(--text)' }}>{langStats.length}</span> langs</span>
+              <span style={{ opacity:0.4 }}>·</span>
+              <span><span style={{ color:'var(--text)' }}>{totalDocs}</span> docs</span>
+            </span>
+          </div>
         </div>
         <button
           onClick={onRefresh}
@@ -180,25 +188,6 @@ function ProjectDashboard({ data, recentChanges, brokenLinks, orphanDocs, graphD
       </div>
 
       <hr style={DIVIDER} />
-
-      <div>
-        <div style={SECTION_LABEL}>Project</div>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:'8px' }}>
-          <StatCard value={totalFiles} label="Files" />
-          <StatCard value={totalFolders} label="Folders" />
-          <StatCard value={langStats.length} label="Languages" />
-          <StatCard value={totalDocs} label="Docs" />
-        </div>
-      </div>
-
-      {graphData && graphData.nodes.length > 1 && (
-        <div>
-          <div style={SECTION_LABEL}>Link Graph ({graphData.nodes.length})</div>
-          <div style={{ height:'360px', background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'8px', overflow:'hidden', position:'relative' }}>
-            <GraphView data={graphData} onNodeClick={handleGraphNodeClick} />
-          </div>
-        </div>
-      )}
 
       {langStats.length > 0 && (
         <div>
@@ -254,8 +243,6 @@ function ProjectDashboard({ data, recentChanges, brokenLinks, orphanDocs, graphD
         </div>
       )}
 
-      <BrokenLinksSection items={brokenLinks} onFileOpen={onFileOpen} rootPath={data.projectPath} />
-
       {recentChanges.length > 0 && (
         <>
           <hr style={DIVIDER} />
@@ -287,7 +274,18 @@ function ProjectDashboard({ data, recentChanges, brokenLinks, orphanDocs, graphD
         </>
       )}
 
+      <BrokenLinksSection items={brokenLinks} onFileOpen={onFileOpen} rootPath={data.projectPath} />
+
       <OrphanDocsSection paths={orphanDocs} onFileOpen={onFileOpen} rootPath={data.projectPath} />
+
+      {graphData && graphData.nodes.length > 1 && (
+        <div>
+          <div style={SECTION_LABEL}>Link Graph ({graphData.nodes.length})</div>
+          <div style={{ height:'360px', background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'8px', overflow:'hidden', position:'relative' }}>
+            <GraphView data={graphData} onNodeClick={handleGraphNodeClick} />
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -76,7 +76,7 @@ export const formatReadError = (err) => {
 // for the whole file, so a 2MB JSON would freeze the UI for seconds.
 export const HIGHLIGHT_SIZE_LIMIT = 1024 * 1024
 
-export const RECENT_CHANGES_LIMIT = 5
+export const RECENT_CHANGES_LIMIT = 10
 export const isHiddenFile = (f) => f.name.startsWith('.') || f.parentDir?.startsWith('.') || /\.tmp\.\d+/.test(f.name)
 export const basenameOf = (p) => p.split('/').pop()
 export const makeRecentEntry = (path, time) => ({ path, name: basenameOf(path), time, lineCount: 0 })

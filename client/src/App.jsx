@@ -50,6 +50,22 @@ function extractDesc(content) {
   return stripMd(fallback)
 }
 
+// ── Sidebar resize ────────────────────────────────────────────────────────────
+const SIDEBAR_DEFAULT_WIDTH = 220
+const SIDEBAR_MIN_WIDTH     = 180
+const SIDEBAR_MAX_CAP       = 480
+
+function clampSidebarWidth(w) {
+  const vwMax = Math.floor(window.innerWidth * 0.6)
+  const max   = Math.min(SIDEBAR_MAX_CAP, vwMax)
+  return Math.max(SIDEBAR_MIN_WIDTH, Math.min(max, w))
+}
+
+function loadSidebarWidth() {
+  const raw = parseInt(localStorage.getItem('vibe-sidebar-width') || '', 10)
+  return clampSidebarWidth(Number.isFinite(raw) ? raw : SIDEBAR_DEFAULT_WIDTH)
+}
+
 // ── About modal ───────────────────────────────────────────────────────────────
 function AboutModal({ onClose }) {
   const [version, setVersion] = useState('')
@@ -62,7 +78,6 @@ function AboutModal({ onClose }) {
           <div style={{ fontFamily:FONT_MONO, fontSize:'11px', color:'var(--muted)', marginTop:'4px' }}>{version ? `v${version}` : ''}</div>
         </div>
         <div style={{ fontSize:'13px', color:'var(--muted)', lineHeight:1.6 }}>
-          코드베이스를 위한 옵시디언.<br />
           AI CLI와 함께 쓰는 문서 편집기.
         </div>
         <div style={{ height:'1px', background:'var(--border)' }} />
@@ -124,6 +139,8 @@ function App() {
   const [pendingAction, setPendingAction]       = useState(null)
   const [activeFocus, setActiveFocus]           = useState('explorer')
   const [sidebarVisible, setSidebarVisible]     = useState(true)
+  const [sidebarWidth, setSidebarWidth]         = useState(() => loadSidebarWidth())
+  const [isResizing, setIsResizing]             = useState(false)
   const [explorerAtRoot, setExplorerAtRoot]     = useState(true)
   const [refreshKey, setRefreshKey]             = useState(0)
   const [theme, setTheme]                       = useState(() => localStorage.getItem('vibe-theme') || 'light')
@@ -153,6 +170,50 @@ function App() {
     document.documentElement.setAttribute('data-theme', theme === 'dark' ? 'dark' : '')
     localStorage.setItem('vibe-theme', theme)
   }, [theme])
+
+  useEffect(() => {
+    localStorage.setItem('vibe-sidebar-width', String(sidebarWidth))
+  }, [sidebarWidth])
+
+  useEffect(() => {
+    const onResize = () => setSidebarWidth(w => clampSidebarWidth(w))
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
+  const startSidebarResize = useCallback((e) => {
+    e.preventDefault()
+    const startX = e.clientX
+    const startW = sidebarWidth
+    setIsResizing(true)
+    let frame = 0
+    let nextW = startW
+    const onMove = (ev) => {
+      nextW = clampSidebarWidth(startW + (ev.clientX - startX))
+      if (!frame) {
+        frame = requestAnimationFrame(() => {
+          frame = 0
+          setSidebarWidth(nextW)
+        })
+      }
+    }
+    const onUp = () => {
+      if (frame) cancelAnimationFrame(frame)
+      setIsResizing(false)
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }, [sidebarWidth])
+
+  const resetSidebarWidth = useCallback(() => {
+    setSidebarWidth(clampSidebarWidth(SIDEBAR_DEFAULT_WIDTH))
+  }, [])
 
   const isDark = theme === 'dark'
 
@@ -564,9 +625,26 @@ function App() {
       )}
 
       <div style={{ display:'flex', flex:1, overflow:'hidden' }}>
-        <div style={{ width: sidebarVisible ? '220px' : '0px', opacity: sidebarVisible ? 1 : 0, visibility: sidebarVisible ? 'visible' : 'hidden', display:'flex', flexDirection:'column', flexShrink:0, borderRight: sidebarVisible ? '1px solid var(--border)' : 'none', background:'var(--bg)', overflow:'hidden', transition:'width 0.25s ease-in-out, opacity 0.2s ease-in-out', userSelect:'none', WebkitUserSelect:'none' }}>
+        <div style={{ width: sidebarVisible ? `${sidebarWidth}px` : '0px', opacity: sidebarVisible ? 1 : 0, visibility: sidebarVisible ? 'visible' : 'hidden', display:'flex', flexDirection:'column', flexShrink:0, borderRight: sidebarVisible ? '1px solid var(--border)' : 'none', background:'var(--bg)', overflow:'hidden', transition: isResizing ? 'none' : 'width 0.25s ease-in-out, opacity 0.2s ease-in-out', userSelect:'none', WebkitUserSelect:'none' }}>
           <FileExplorer key={rootPath} innerRef={explorerRef} onFocus={focusExplorer} onFileSelect={handleFileSelect} isFocused={activeFocus === 'explorer'} onAtRootChange={setExplorerAtRoot} refreshKey={refreshKey} activeFilePath={selectedFile?.path} changedFiles={changedFiles} gitFiles={gitInfo.filesByAbs} gitInfo={gitInfo} />
         </div>
+
+        {sidebarVisible && (
+          <div
+            onMouseDown={startSidebarResize}
+            onDoubleClick={resetSidebarWidth}
+            title="드래그하여 너비 조절 · 더블클릭 시 기본값"
+            onMouseEnter={e => { if (!isResizing) e.currentTarget.style.background = 'var(--border)' }}
+            onMouseLeave={e => { if (!isResizing) e.currentTarget.style.background = 'transparent' }}
+            style={{
+              position: 'relative',
+              width: '8px', marginLeft: '-4px', marginRight: '-4px',
+              cursor: 'col-resize', flexShrink: 0, zIndex: 5,
+              background: isResizing ? 'var(--accent)' : 'transparent',
+              transition: isResizing ? 'none' : 'background 150ms',
+            }}
+          />
+        )}
 
         <div style={{ display:'flex', flex:1, overflow:'hidden', background:'var(--surface)' }}>
           {selectedFile ? (
