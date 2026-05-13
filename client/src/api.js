@@ -52,6 +52,9 @@ export const getBrokenLinks = () =>
 export const getOrphanDocs = () =>
   invoke('get_orphan_docs')
 
+export const getGraphData = () =>
+  invoke('get_graph_data')
+
 export const openExternal = (url) =>
   invoke('open_external', { url })
 

@@ -125,4 +125,4 @@ Tauri v2 · Rust · React + Vite · react-markdown · react-syntax-highlighter �
 
 ## 라이선스
 
-MIT
+[Mozilla Public License 2.0](./LICENSE)

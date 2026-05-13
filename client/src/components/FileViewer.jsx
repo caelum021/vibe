@@ -5,10 +5,11 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { oneLight }    from 'react-syntax-highlighter/dist/esm/styles/prism'
 import * as api from '../api'
 import CodeRow from './CodeRow'
+import PlainCodeRow from './PlainCodeRow'
 import DiffView from './DiffView'
 import MarkdownView from './MarkdownView'
 import BacklinksPanel from './BacklinksPanel'
-import { resolveKey, LINE_HEIGHT_PX, EDIT_PADDING_PX, LINE_NUM_WIDTH, FONT_MONO, FONT_UI, EXT_TO_DISPLAY } from '../constants'
+import { resolveKey, LINE_HEIGHT_PX, EDIT_PADDING_PX, LINE_NUM_WIDTH, FONT_MONO, FONT_UI, EXT_TO_DISPLAY, HIGHLIGHT_SIZE_LIMIT } from '../constants'
 
 const NavBtn = ({ onClick, enabled, title, label, glyph }) => (
   <button onClick={onClick} disabled={!enabled} title={title} aria-label={label}
@@ -27,7 +28,7 @@ const FileViewer = ({
   externallyChanged, onReload, openSearchRef, closeSearchRef,
   rootPath, onLinkOpen,
   onBack, onForward, canBack, canForward,
-  initialScroll, onScrollChange,
+  initialScroll, onScrollChange, loading,
 }) => {
   const [mdTab, setMdTab] = useState('edit')
   const [diffData, setDiffData] = useState(null)
@@ -283,6 +284,10 @@ const FileViewer = ({
   const searchMatchSet = useMemo(() => new Set(searchMatches), [searchMatches])
   const currentMatchLine = searchMatches.length > 0 ? searchMatches[currentMatchIdx] : -1
 
+  // Large files skip syntax highlighting — prism's whole-content tokenization would block the UI.
+  const skipHighlight = !isMd && !isEditing && content.length > HIGHLIGHT_SIZE_LIMIT
+  const plainLines = useMemo(() => skipHighlight ? content.split('\n') : null, [skipHighlight, content])
+
   const codeRenderer = useCallback(({ rows, stylesheet, useInlineStyles }) => (
     <VirtualList
       listRef={listRef}
@@ -308,6 +313,9 @@ const FileViewer = ({
           {selectedFile?.name}{isDirty ? ' *' : ''}
         </span>
         <span style={{ fontSize:'10px', color:'var(--muted)', background:'var(--surface-2)', border:'1px solid var(--border)', borderRadius:'4px', padding:'1px 6px', fontFamily:FONT_MONO, flexShrink:0 }}>{langBadge}</span>
+        {skipHighlight && (
+          <span title="Syntax highlighting disabled for files over 1MB" style={{ fontSize:'10px', color:'var(--muted)', fontFamily:FONT_MONO, flexShrink:0, opacity:0.6 }}>plain</span>
+        )}
 
         {isEditing && isMd && (
           <div style={{ display:'flex' }}>
@@ -394,7 +402,9 @@ const FileViewer = ({
       {/* Content — code viewer & edit pane fill via flex; markdown flows in scroll container. */}
       <div ref={scrollContainerRef} data-scroll-container onScroll={isMd && !isEditing ? handleMdScroll : undefined} style={{ flex:1, overflow: isFlexLayout ? 'hidden' : 'auto', padding: isFlexLayout ? '0' : isMd ? '24px 32px' : '0', display: isFlexLayout ? 'flex' : 'block', flexDirection:'column', minHeight:0 }}>
         {selectedFile && (
-          showDiff ? (
+          loading && !content ? (
+            <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', color:'var(--muted)', fontSize:'11px', fontFamily:FONT_MONO, letterSpacing:'0.08em', textTransform:'uppercase' }}>loading…</div>
+          ) : showDiff ? (
             diffError ? <div style={{ padding:'24px', color:'var(--error)', fontFamily:FONT_MONO, fontSize:'12px', whiteSpace:'pre-wrap' }}>Diff failed: {diffError}</div>
             : !diffData ? <div style={{ padding:'24px', color:'var(--muted)', fontSize:'12px' }}>Loading diff…</div>
             : <DiffView diff={diffData} sideBySide={diffSideBySide} />
@@ -430,6 +440,17 @@ const FileViewer = ({
                 searchQuery={searchOpen ? searchQuery : ''} currentMatchIdx={currentMatchIdx} onMatchesFound={setMdMatchCount} />
               <BacklinksPanel path={selectedFile?.path} rootPath={rootPath} onLinkOpen={onLinkOpen} />
             </>
+          ) : skipHighlight ? (
+            <VirtualList
+              listRef={listRef}
+              rowCount={plainLines.length}
+              rowHeight={LINE_HEIGHT_PX}
+              rowProps={{ lines: plainLines, searchMatchSet, currentMatchLine }}
+              rowComponent={PlainCodeRow}
+              overscanCount={5}
+              onRowsRendered={handleRowsRendered}
+              style={{ overflowX: 'auto', flex: 1, minHeight: 0 }}
+            />
           ) : (
             <SyntaxHighlighter
               language={ext || 'text'}

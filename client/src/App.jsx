@@ -134,6 +134,8 @@ function App() {
   const [dashboardData, setDashboardData]       = useState(null)
   const [brokenLinks, setBrokenLinks]           = useState([])
   const [orphanDocs, setOrphanDocs]             = useState([])
+  const [graphData, setGraphData]               = useState(null)
+  const [fileLoading, setFileLoading]           = useState(false)
   const [projects, setProjects]                 = useState(() => loadProjects())
   const [gitInfo, setGitInfo]                   = useState({ isRepo: false, branch: null, filesByAbs: new Map(), dirtyCount: 0 })
   const [refreshing, setRefreshing]             = useState(false)
@@ -165,11 +167,13 @@ function App() {
   const isDirty = isEditing && editContent !== fileContent
 
   useEffect(() => {
-    if (!selectedFile || selectedFile.isDirectory) { setFileContent(''); return }
+    if (!selectedFile || selectedFile.isDirectory) { setFileContent(''); setFileLoading(false); return }
     setIsEditing(false); setEditContent(''); setDiffMode(false)
+    setFileLoading(true)
     api.readFile(selectedFile.path)
       .then(d => setFileContent(d.content || ''))
       .catch(err => setFileContent(formatReadError(err)))
+      .finally(() => setFileLoading(false))
   }, [selectedFile])
 
   const loadGitStatus = useCallback(async (rootAbs) => {
@@ -265,9 +269,14 @@ function App() {
 
   const loadLinkHealth = useCallback(async () => {
     try {
-      const [broken, orphans] = await Promise.all([api.getBrokenLinks(), api.getOrphanDocs()])
+      const [broken, orphans, graph] = await Promise.all([
+        api.getBrokenLinks(),
+        api.getOrphanDocs(),
+        api.getGraphData(),
+      ])
       setBrokenLinks(broken || [])
       setOrphanDocs(orphans || [])
+      setGraphData(graph || null)
     } catch (e) { console.error('Link health load failed:', e) }
   }, [])
 
@@ -422,7 +431,7 @@ function App() {
     setSelectedFile(null); setFileContent(''); setIsEditing(false); setEditContent('')
     setChangedFiles(new Set()); setRecentChanges([])
     setDashboardData(null)
-    setBrokenLinks([]); setOrphanDocs([])
+    setBrokenLinks([]); setOrphanDocs([]); setGraphData(null)
     setNav({ stack: [], index: -1 })
     navScrollsRef.current = []
     setGitInfo({ isRepo: false, branch: null, filesByAbs: new Map(), dirtyCount: 0 })
@@ -562,11 +571,11 @@ function App() {
         <div style={{ display:'flex', flex:1, overflow:'hidden', background:'var(--surface)' }}>
           {selectedFile ? (
             <div style={{ flex:1, minWidth:'40%', overflow:'hidden' }}>
-              <FileViewer innerRef={viewerRef} onFocus={focusViewer} onClose={closeViewer} onEnterEdit={enterEditMode} onExitEdit={exitEditMode} onSave={saveFile} onEditContentChange={setEditContent} selectedFile={selectedFile} content={fileContent} isEditing={isEditing} editContent={editContent} isDirty={isDirty} isMd={isMd} isDark={isDark} isFocused={activeFocus === 'viewer'} gitDirty={gitDirty} diffMode={diffMode} onEnterDiff={enterDiffMode} onExitDiff={exitDiffMode} externallyChanged={externallyChanged} onReload={reloadCurrentFile} openSearchRef={openSearchRef} closeSearchRef={closeSearchRef} rootPath={rootPath} onLinkOpen={handleLinkOpen} onBack={goBack} onForward={goForward} canBack={nav.index > 0} canForward={nav.index >= 0 && nav.index < nav.stack.length - 1} initialScroll={navScrollsRef.current[nav.index]} onScrollChange={handleScrollChange} />
+              <FileViewer innerRef={viewerRef} onFocus={focusViewer} onClose={closeViewer} onEnterEdit={enterEditMode} onExitEdit={exitEditMode} onSave={saveFile} onEditContentChange={setEditContent} selectedFile={selectedFile} content={fileContent} isEditing={isEditing} editContent={editContent} isDirty={isDirty} isMd={isMd} isDark={isDark} isFocused={activeFocus === 'viewer'} gitDirty={gitDirty} diffMode={diffMode} onEnterDiff={enterDiffMode} onExitDiff={exitDiffMode} externallyChanged={externallyChanged} onReload={reloadCurrentFile} openSearchRef={openSearchRef} closeSearchRef={closeSearchRef} rootPath={rootPath} onLinkOpen={handleLinkOpen} onBack={goBack} onForward={goForward} canBack={nav.index > 0} canForward={nav.index >= 0 && nav.index < nav.stack.length - 1} initialScroll={navScrollsRef.current[nav.index]} onScrollChange={handleScrollChange} loading={fileLoading} />
             </div>
           ) : (
             <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-              <ProjectDashboard data={dashboardData} recentChanges={recentChanges} brokenLinks={brokenLinks} orphanDocs={orphanDocs} onFileOpen={handleFileSelect} onRefresh={refreshAll} refreshing={refreshing} justRefreshed={justRefreshed} gitInfo={gitInfo} />
+              <ProjectDashboard data={dashboardData} recentChanges={recentChanges} brokenLinks={brokenLinks} orphanDocs={orphanDocs} graphData={graphData} onFileOpen={handleFileSelect} onRefresh={refreshAll} refreshing={refreshing} justRefreshed={justRefreshed} gitInfo={gitInfo} />
             </div>
           )}
         </div>

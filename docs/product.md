@@ -65,19 +65,27 @@ AI CLI(Claude Code, Gemini CLI 등)로 코딩하는 개발자. AI가 코드를 �
 - 파일 열람 히스토리 (⌘[ / ⌘] / ⌘← / ⌘→) + per-entry 스크롤 위치 기억
 - 브랜딩 cool-shift 팔레트 + `vibe.` 로고 마침표 + 앱 아이콘 재생성
 
+### v1.2.0 — 링크 그래프 시각화 & 뷰어 안정화
+
+v1.1.0에서 만든 링크 인덱스를 대시보드에 시각화. 문서 의존성을 한눈에 본다. 큰 파일 안정화 + 마크다운 소프트 줄바꿈 + 라이선스 전환을 함께.
+
+- 대시보드 미니 그래프 — force-directed, root-left / deeper-right 계층 힌트, 노드 클릭으로 파일 열기 (200-node cap)
+- 그래프 click-to-interact (wheel-zoom이 페이지 스크롤을 가로채지 않음) + 라벨 폭 기반 collide
+- 격리 문서(in=0, out=0)는 그래프에서 제외 — Orphan Docs 패널이 이미 노출 중
+- 뷰어 파일 크기 한도 1MB → 2MB, 1MB 초과 시 plain row fallback, 첫 read 로딩 인디케이터
+- remark-breaks — 단일 줄바꿈을 `<br>`로 렌더 (Obsidian/GitHub 관례)
+- 라이선스 MIT → Mozilla Public License 2.0
+
 ---
 
 ## 다음 버전 — 마크다운 기능 확장
 
-v1.1.0의 링크 그래프 인프라 위에 올릴 수 있는 후속 기능들. 우선순위는 실제 사용 피드백 이후 재조정.
+v1.1.0의 링크 그래프 인프라 위에 올릴 수 있는 후속 기능들. 우선순위는 실제 사용 피드백 이후 재조정. (v1.2.0에서 "미니 그래프 뷰" 구현 완료.)
 
 ### 우선순위 중간
 
 **헤딩 아웃라인**
 md 파일 열면 H1/H2/H3 트리 표시, 클릭 시 해당 위치로 점프.
-
-**미니 그래프 뷰**
-대시보드에 문서 의존성 그래프. 노드=md, 엣지=링크 관계, 크기=참조 횟수. 힘 기반 레이아웃보다 계층적 레이아웃이 설계문서에 적합 (상위/하위 관계가 명확히 보임). `d3.js` or `cytoscape.js`.
 
 **프로젝트 전체 md 풀텍스트 검색**
 docs/ 전체에서 키워드 검색.
@@ -102,7 +110,9 @@ Claude(warm cream/coral) 계열과의 시각적 혼동을 줄이기 위한 최�
 
 대시보드 전면 개편안(ActionCard, Activity timeline, Actor 탐지, cool ink/paper 전체 전복)은 [`design/vibe-design-system-v2-proposal.md`](./design/vibe-design-system-v2-proposal.md)에 **deferred로 보관**. markdown 1급 시민 기능(그래프 뷰, 링크 탐색 등)이 새로운 surface를 만들면 그때 이 제안서를 재료로 꺼내 재설계한다. 지금은 조용한 도구 기조가 우선.
 
-## v1.2.0 — 문서 구조 온보딩 (제안 - 검토 필요)
+## 다음 버전 후보 — 문서 구조 온보딩 (제안)
+
+원래 v1.2.0 후보로 두었던 방향. v1.2.0은 링크 그래프 시각화로 진행했고, 이 제안은 다음 버전 후보로 보존.
 
 새 프로젝트를 열었을 때 AI 협업에 필요한 문서 구조를 Vibe가 자동으로 제안한다. 각자 튜닝해서 만들려면 시간이 걸리는 부분을 대신 깔아주는 것.
 
