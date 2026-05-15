@@ -9,15 +9,6 @@ function saveCollapsed(set) { localStorage.setItem(COLLAPSED_KEY, JSON.stringify
 function loadPinned()    { try { return new Set(JSON.parse(localStorage.getItem(PINNED_KEY)))    } catch { return new Set() } }
 function savePinned(set) { localStorage.setItem(PINNED_KEY,    JSON.stringify([...set])) }
 
-function StatCard({ value, label }) {
-  return (
-    <div style={{ background:'var(--surface-2)', border:'1px solid var(--border)', borderRadius:'6px', padding:'8px 16px' }}>
-      <div style={{ fontFamily:FONT_MONO, fontSize:'20px', fontWeight:500, color:'var(--text)', lineHeight:1.2 }}>{value}</div>
-      <div style={{ fontSize:'10px', color:'var(--muted)', marginTop:'2px', textTransform:'uppercase', letterSpacing:'0.06em' }}>{label}</div>
-    </div>
-  )
-}
-
 function DocItem({ doc, gitInfo, isPinned, onTogglePin, onFileOpen }) {
   const icon = getDocIcon(doc.name)
   const gitState = gitInfo?.filesByAbs?.get(doc.path)
@@ -63,7 +54,7 @@ function BrokenLinksSection({ items, onFileOpen, rootPath }) {
       <hr style={DIVIDER} />
       <div>
         <div style={SECTION_LABEL}>Broken Links ({items.length})</div>
-        <div style={{ display:'flex', flexDirection:'column', gap:'2px', maxHeight:'260px', overflowY:'auto' }}>
+        <div style={{ display:'flex', flexDirection:'column', gap:'2px' }}>
           {items.map((b, i) => (
             <div
               key={`${b.source}:${b.line}:${i}`}
@@ -91,7 +82,7 @@ function OrphanDocsSection({ paths, onFileOpen, rootPath }) {
   return (
     <div>
       <div style={SECTION_LABEL}>Orphan Docs ({paths.length})</div>
-      <div style={{ display:'flex', flexDirection:'column', gap:'2px', maxHeight:'220px', overflowY:'auto' }}>
+      <div style={{ display:'flex', flexDirection:'column', gap:'2px' }}>
         {paths.map((p) => (
           <div
             key={p}
