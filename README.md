@@ -42,7 +42,7 @@ On macOS, open the DMG and drag the app to your Applications folder.
 
 - **Project stats** — file count, folder count, language breakdown
 - **Documents** — markdown docs in your project root and `docs/` subdirectories, auto-grouped and listed
-- **Recently Changed** — last 5 modified files, so you can immediately see what your AI CLI just touched
+- **Recently Changed** — last 10 modified files, so you can immediately see what your AI CLI just touched
 - **Git status** — current branch and working tree state
 
 This is especially useful when returning to a project after an AI session — you can quickly orient yourself without digging through the file tree.
@@ -85,6 +85,8 @@ vibe                     # Folder picker dialog
 | `C` | Copy path |
 | `Space` / `Shift+Space` | Page scroll |
 | `Esc` | Close / Back |
+
+> Tip: Drag the sidebar's right edge to resize it. Double-click the edge to reset to the default width.
 
 <br>
 

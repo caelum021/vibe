@@ -47,38 +47,38 @@
 vibe/
 ├── client/                          # React frontend (Vite)
 │   ├── src/
-│   │   ├── main.jsx                 #   9 lines — React DOM entry
-│   │   ├── App.jsx                  # 403 lines — state management, layout, global keys
-│   │   ├── api.js                   #  44 lines — all invoke() calls (Rust ↔ JS bridge)
-│   │   ├── constants.js             # 142 lines — shared constants, helpers, styles
+│   │   ├── main.jsx                 # React DOM entry
+│   │   ├── App.jsx                  # state management, layout, global keys
+│   │   ├── api.js                   # all invoke() calls (Rust ↔ JS bridge)
+│   │   ├── constants.js             # shared constants, helpers, styles
 │   │   └── components/
-│   │       ├── FileExplorer.jsx     # 404 lines — tree navigation, CRUD, git badges
-│   │       ├── FileViewer.jsx       # 224 lines — code/markdown/diff viewer + editor
-│   │       ├── Dashboard.jsx        # 175 lines — project stats, docs, recent changes
-│   │       ├── NoRootScreen.jsx     # 192 lines — project picker + dropdown
-│   │       ├── DiffView.jsx         # 116 lines — inline/split diff (virtualized)
-│   │       ├── MarkdownView.jsx     #  63 lines — markdown renderer + image support
-│   │       └── CodeRow.jsx          #  13 lines — virtualized code row
+│   │       ├── FileExplorer.jsx     # tree navigation, CRUD, git badges
+│   │       ├── FileViewer.jsx       # code/markdown/diff viewer + editor
+│   │       ├── Dashboard.jsx        # project stats, docs, recent changes
+│   │       ├── NoRootScreen.jsx     # project picker + dropdown
+│   │       ├── DiffView.jsx         # inline/split diff (virtualized)
+│   │       ├── MarkdownView.jsx     # markdown renderer + image support
+│   │       └── CodeRow.jsx          # virtualized code row
 │   ├── index.html
 │   ├── style.css                    # CSS variables (light/dark), keyframes
 │   └── package.json
 │
 ├── src-tauri/                       # Rust backend (Tauri v2)
 │   ├── src/
-│   │   ├── main.rs                  #   5 lines — entry point
-│   │   ├── lib.rs                   #  53 lines — Tauri builder, plugin/handler registration
-│   │   ├── state.rs                 #  27 lines — AppState (root + watcher behind Mutex)
-│   │   ├── error.rs                 #  29 lines — AppError enum (thiserror + Serialize)
-│   │   ├── constants.rs             #  16 lines — IGNORED directory list
+│   │   ├── main.rs                  # entry point
+│   │   ├── lib.rs                   # Tauri builder, plugin/handler registration
+│   │   ├── state.rs                 # AppState (root + watcher behind Mutex)
+│   │   ├── error.rs                 # AppError enum (thiserror + Serialize)
+│   │   ├── constants.rs             # IGNORED directory list
 │   │   ├── commands/
-│   │   │   ├── mod.rs               #   4 lines
-│   │   │   ├── file_ops.rs          # 303 lines — file CRUD, list_all_files, read_image
-│   │   │   ├── git.rs               # 215 lines — git_status, git_diff (libgit2)
-│   │   │   ├── watcher_cmd.rs       #  49 lines — set_root, get_root
-│   │   │   └── dialog.rs            #  15 lines — pick_folder (native async)
+│   │   │   ├── mod.rs               # command module exports
+│   │   │   ├── file_ops.rs          # file CRUD, list_all_files, read_image
+│   │   │   ├── git.rs               # git_status, git_diff (libgit2)
+│   │   │   ├── watcher_cmd.rs       # set_root, get_root
+│   │   │   └── dialog.rs            # pick_folder (native async)
 │   │   └── watcher/
-│   │       ├── mod.rs               #  83 lines — spawn_watcher, event filtering
-│   │       └── debounce.rs          #  43 lines — 150ms debounce, blocks when idle
+│   │       ├── mod.rs               # spawn_watcher, event filtering
+│   │       └── debounce.rs          # 150ms debounce, blocks when idle
 │   ├── Cargo.toml
 │   ├── tauri.conf.json
 │   └── capabilities/
@@ -93,7 +93,6 @@ vibe/
         └── design.md               # 디자인 시스템 스펙
 ```
 
-**총 소스 코드:** Rust ~842줄 + JS/JSX ~1,618줄 ≈ **2,460줄**
 
 ---
 
@@ -199,7 +198,7 @@ app.emit("file-changed", FileChangedPayload { paths, kind })
 ### 4.1 Component Hierarchy
 
 ```
-App (403 lines)
+App
 ├── NoRootScreen          — rootReady=false 일 때 표시
 │   └── ProjectDropdown   — footer 프로젝트 전환 드롭다운
 │
@@ -214,7 +213,10 @@ App (403 lines)
 │       └── MarkdownImage  — base64 이미지 로딩
 │
 └── ProjectDashboard      — selectedFile=null 일 때 표시
-    └── StatCard
+    ├── DocItem              — 문서 행 (핀, git 뱃지, 라인 수)
+    ├── BrokenLinksSection
+    ├── OrphanDocsSection
+    └── GraphView            — 링크 그래프 (d3-force)
 ```
 
 ### 4.2 View States
@@ -232,7 +234,7 @@ rootReady=true   →  Left: FileExplorer (항상)
 
 ### 4.3 Module Responsibilities
 
-#### `App.jsx` (403 lines) — Orchestrator
+#### `App.jsx` — Orchestrator
 
 핵심 역할: **전역 상태 관리**, **IPC 이벤트 핸들링**, **키보드 라우팅**, **레이아웃**
 
@@ -244,7 +246,7 @@ rootReady=true   →  Left: FileExplorer (항상)
 - `requireClean` 패턴 — 편집 중 파일 전환/닫기 시 "저장하시겠습니까?" 모달
 - 글로벌 keydown: `Ctrl+B` sidebar, `Ctrl+Shift+L` theme, `Cmd+1-9` project switch, `Ctrl+R` refresh, `Esc` close/exit, viewer keys (E/D/L/Space)
 
-#### `FileExplorer.jsx` (404 lines) — Tree Navigation
+#### `FileExplorer.jsx` — Tree Navigation
 
 Props: `onFileSelect`, `isFocused`, `innerRef`, `refreshKey`, `activeFilePath`, `changedFiles`, `gitFiles`, `gitInfo`
 
@@ -255,7 +257,7 @@ Props: `onFileSelect`, `isFocused`, `innerRef`, `refreshKey`, `activeFilePath`, 
 - `dirtyDirs` — 접힌 폴더에 dirty 파일이 있으면 bubble-up 배지
 - Git 배지: 2-state (touched=accent, deleted=muted)
 
-#### `FileViewer.jsx` (224 lines) — Code/Markdown/Diff Viewer + Editor
+#### `FileViewer.jsx` — Code/Markdown/Diff Viewer + Editor
 
 Props: `selectedFile`, `content`, `isEditing`, `editContent`, `isDirty`, `isMd`, `isDark`, `diffMode`, `gitDirty`, `externallyChanged`, ...
 
@@ -265,40 +267,42 @@ Props: `selectedFile`, `content`, `isEditing`, `editContent`, `isDirty`, `isMd`,
 - **외부 변경 감지**: `externallyChanged` 배지 → L키로 reload
 - Tab indent (2 spaces), Ctrl+S save, Ctrl+P edit/preview (md)
 
-#### `Dashboard.jsx` (175 lines) — Project Overview
+#### `Dashboard.jsx` — Project Overview
 
-Props: `data`, `recentChanges`, `onFileOpen`, `onRefresh`, `refreshTrigger`, `gitInfo`
+Props: `data`, `recentChanges`, `brokenLinks`, `orphanDocs`, `graphData`, `onFileOpen`, `onRefresh`, `gitInfo`
 
-- StatCard 4개: Files, Folders, Languages, Docs
-- 언어 분포 바 차트
-- 문서 목록 (그룹별, 설명 + 라인 수)
-- Recently Changed (5개, `formatAge`)
-- Refresh 버튼 + `refreshTrigger` 카운터 (Ctrl+R 연동)
+- 헤더 — 프로젝트명, path, `⎇ branch ~ N changed`, inline stats (`128 files · 32 folders · 6 langs · 19 docs`). v1.2.x에서 PROJECT StatCard 4개를 헤더로 흡수.
+- 언어 분포 바 차트 (단독 row)
+- 문서 목록 (그룹별, 설명 + 라인 수, 핀 가능)
+- Recently Changed (10개, `formatAge`)
+- Broken Links / Orphan Docs (각 단독 row, 항목 있을 때만)
+- Link Graph — `GraphView` (d3-force, 페이지 맨 아래, 항상 펼침)
+- Refresh 버튼 (Ctrl+R 연동)
 
-#### `NoRootScreen.jsx` (192 lines) — Project Picker
+#### `NoRootScreen.jsx` — Project Picker
 
 - "폴더 열기" 버튼 → `api.pickFolder()`
 - Recent Projects 목록 (drag-to-reorder, 삭제, `Cmd+N` 단축키)
 - `ProjectDropdown` — footer에서 프로젝트 전환
 
-#### `DiffView.jsx` (116 lines)
+#### `DiffView.jsx`
 
 - `flattenHunks()` → inline rows, `pairHunks()` → side-by-side pairs
 - `react-window` `VirtualList`로 렌더링
 - 색상: `color-mix(in srgb, var(--success/error) 12%, transparent)`
 
-#### `MarkdownView.jsx` (63 lines)
+#### `MarkdownView.jsx`
 
 - `react-markdown` + `remark-gfm` + `rehype-raw`
 - `MarkdownImage`: 로컬 이미지 → `api.readImage()` → base64 data URL
 - 커스텀 컴포넌트: h1(Instrument Serif italic), code(SyntaxHighlighter), table, blockquote...
 
-#### `CodeRow.jsx` (13 lines)
+#### `CodeRow.jsx`
 
 - `react-syntax-highlighter`의 `createElement`로 단일 행 렌더링
 - Sticky line number gutter
 
-### 4.4 `api.js` — IPC Bridge (44 lines)
+### 4.4 `api.js` — IPC Bridge
 
 ```js
 // 모든 Rust 커맨드의 JS 바인딩. 단일 접점.
@@ -318,7 +322,7 @@ gitDiff(path)                      →  invoke('git_diff', ...)
 onFileChanged(callback)            →  listen('file-changed', ...)
 ```
 
-### 4.5 `constants.js` — Shared Constants (142 lines)
+### 4.5 `constants.js` — Shared Constants
 
 | Category | Exports |
 |----------|---------|
