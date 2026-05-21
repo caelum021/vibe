@@ -10,46 +10,11 @@ import NoRootScreen, { ProjectDropdown } from './components/NoRootScreen'
 import {
   resolveKey, formatReadError, FONT_MONO, FONT_SERIF, FONT_UI,
   DOC_EXTENSIONS, DOC_FOLDERS, EXT_TO_LANG, LANG_COLORS,
-  RECENT_CHANGES_LIMIT, isHiddenFile, basenameOf, makeRecentEntry,
+  isHiddenFile, basenameOf,
   loadProjects, addProject,
   SHORTCUTS_VIEWER_VIEW, SHORTCUTS_VIEWER_VIEW_DIRTY, SHORTCUTS_VIEWER_DIFF,
   SHORTCUTS_VIEWER_EDIT, SHORTCUTS_VIEWER_EDIT_MD, SHORTCUTS_EXPLORER,
 } from './constants'
-
-// ── Doc description extraction ───────────────────────────────────────────────
-function stripMd(text) {
-  return text
-    .replace(/!\[[^\]]*\]\([^)]+\)/g, '')        // images
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')     // [text](url)
-    .replace(/\*\*([^*]+)\*\*/g, '$1')           // bold
-    .replace(/\*([^*]+)\*/g, '$1')               // italic
-    .replace(/`([^`]+)`/g, '$1')                 // inline code
-    .replace(/^>\s*/, '')                         // blockquote prefix
-    .replace(/^[-*+]\s+/, '')                    // list prefix
-    .trim()
-}
-
-function extractDesc(content) {
-  const lines = content.split('\n')
-  let i = 0
-  // Skip frontmatter block
-  if (lines[0]?.trim() === '---') {
-    i = 1
-    while (i < lines.length && lines[i]?.trim() !== '---') i++
-    i++
-  }
-  let afterH1 = false
-  let fallback = ''
-  for (; i < lines.length; i++) {
-    const t = lines[i].trim()
-    if (!t || t.startsWith('<!--')) continue
-    if (t.startsWith('# ')) { afterH1 = true; continue }
-    if (t.startsWith('#')) continue
-    if (afterH1) return stripMd(t)
-    if (!fallback) fallback = t
-  }
-  return stripMd(fallback)
-}
 
 // ── Sidebar resize ────────────────────────────────────────────────────────────
 const SIDEBAR_DEFAULT_WIDTH = 220
@@ -144,7 +109,6 @@ function App() {
   const [aboutOpen, setAboutOpen]               = useState(false)
   const [rootPath, setRootPath]                 = useState('')
   const [changedFiles, setChangedFiles]         = useState(new Set())
-  const [recentChanges, setRecentChanges]       = useState([])
   const [dashboardData, setDashboardData]       = useState(null)
   const [brokenLinks, setBrokenLinks]           = useState([])
   const [orphanDocs, setOrphanDocs]             = useState([])
@@ -352,32 +316,15 @@ function App() {
       const docsWithLines = await Promise.all(docs.map(async (doc) => {
         try {
           const d = await api.readFile(doc.path)
-          const content = d.content || ''
-          const lines = content.split('\n').length
-          let desc = extractDesc(content)
-          if (desc.length > 60) desc = desc.slice(0, 57) + '...'
-          return { ...doc, lineCount: lines, desc }
-        } catch (_) { return { ...doc, lineCount: 0, desc: '' } }
+          const lines = (d.content || '').split('\n').length
+          return { ...doc, lineCount: lines }
+        } catch (_) { return { ...doc, lineCount: 0 } }
       }))
-      const docGroups = [], folderMap = {}
-      for (const d of docsWithLines) {
-        const groupKey = d.relDir || ''
-        ;(folderMap[groupKey] ??= []).push(d)
-      }
-      if (folderMap['']?.length) docGroups.push({ group: null, items: folderMap[''] })
-      Object.keys(folderMap).filter(k => k).sort().forEach(f => docGroups.push({ group: f + '/', items: folderMap[f] }))
-
       const langCounts = {}
       Object.entries(extCounts).forEach(([ext, count]) => { const lang = EXT_TO_LANG[ext]; if (lang) langCounts[lang] = (langCounts[lang] || 0) + count })
       const totalLang = Object.values(langCounts).reduce((a, b) => a + b, 0) || 1
       const langStats = Object.entries(langCounts).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([name, count]) => ({ name, pct: Math.round(count / totalLang * 100), color: LANG_COLORS[name] || LANG_COLORS.Other }))
-      const recentFiles = allFiles
-        .filter(f => f.modifiedMs && !isHiddenFile(f))
-        .sort((a, b) => b.modifiedMs - a.modifiedMs)
-        .slice(0, RECENT_CHANGES_LIMIT)
-        .map(f => makeRecentEntry(f.path, f.modifiedMs))
-      setRecentChanges(recentFiles)
-      setDashboardData({ projectName: basenameOf(rootPath_) || 'project', projectPath: rootPath_, totalFiles: allFiles.length, totalFolders, langStats, docGroups })
+      setDashboardData({ projectName: basenameOf(rootPath_) || 'project', projectPath: rootPath_, totalFiles: allFiles.length, totalFolders, langStats, docs: docsWithLines })
     } catch (e) { console.error('Dashboard load failed:', e) }
   }, [])
 
@@ -606,7 +553,7 @@ function App() {
     await api.setRoot(path)
     setTabs([]); setActiveId(null)
     navScrollsByTabRef.current = new Map()
-    setChangedFiles(new Set()); setRecentChanges([])
+    setChangedFiles(new Set())
     setDashboardData(null)
     setBrokenLinks([]); setOrphanDocs([]); setGraphData(null)
     setGitInfo({ isRepo: false, branch: null, filesByAbs: new Map(), dirtyCount: 0 })
@@ -642,19 +589,6 @@ function App() {
       if (paths.length > 0) {
         setRefreshKey(k => k + 1)
         setChangedFiles(prev => { const n = new Set(prev); paths.forEach(p => n.add(p)); return n })
-        const now = Date.now()
-        const filtered = paths.filter(p => !isHiddenFile({ name: basenameOf(p) }))
-        if (filtered.length > 0) {
-          const filteredSet = new Set(filtered)
-          const newEntries = filtered.map(p => makeRecentEntry(p, now))
-          setRecentChanges(prev => [...newEntries, ...prev.filter(e => !filteredSet.has(e.path))].slice(0, RECENT_CHANGES_LIMIT))
-          Promise.all(newEntries.map(entry =>
-            api.readFile(entry.path).then(d => ({ path: entry.path, time: entry.time, lineCount: (d.content || '').split('\n').length })).catch(() => null)
-          )).then(results => {
-            const counts = Object.fromEntries(results.filter(Boolean).map(r => [r.path + r.time, r.lineCount]))
-            if (Object.keys(counts).length > 0) setRecentChanges(prev => prev.map(e => counts[e.path + e.time] ? { ...e, lineCount: counts[e.path + e.time] } : e))
-          })
-        }
         // Debounced dashboard refresh on file changes
         if (dashboardRefetchTimerRef.current) clearTimeout(dashboardRefetchTimerRef.current)
         dashboardRefetchTimerRef.current = setTimeout(() => { loadDashboard(); loadLinkHealth() }, 2000)
@@ -786,7 +720,7 @@ function App() {
             </div>
           ) : (
             <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-              <ProjectDashboard data={dashboardData} recentChanges={recentChanges} brokenLinks={brokenLinks} orphanDocs={orphanDocs} graphData={graphData} onFileOpen={handleFileSelect} onRefresh={refreshAll} refreshing={refreshing} justRefreshed={justRefreshed} gitInfo={gitInfo} />
+              <ProjectDashboard data={dashboardData} brokenLinks={brokenLinks} orphanDocs={orphanDocs} graphData={graphData} onFileOpen={handleFileSelect} onRefresh={refreshAll} refreshing={refreshing} justRefreshed={justRefreshed} gitInfo={gitInfo} />
             </div>
           )}
         </div>
