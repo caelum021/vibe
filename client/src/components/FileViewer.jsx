@@ -9,7 +9,7 @@ import PlainCodeRow from './PlainCodeRow'
 import DiffView from './DiffView'
 import MarkdownView from './MarkdownView'
 import BacklinksPanel from './BacklinksPanel'
-import { resolveKey, LINE_HEIGHT_PX, EDIT_PADDING_PX, LINE_NUM_WIDTH, FONT_MONO, FONT_UI, EXT_TO_DISPLAY, HIGHLIGHT_SIZE_LIMIT } from '../constants'
+import { resolveKey, EDIT_FONT_PX, LINE_HEIGHT_PX, EDIT_PADDING_PX, LINE_NUM_WIDTH, FONT_MONO, FONT_UI, EXT_TO_DISPLAY, HIGHLIGHT_SIZE_LIMIT } from '../constants'
 import { handleOutlineKey } from '../outline'
 
 const NavBtn = ({ onClick, enabled, title, label, glyph }) => (
@@ -61,6 +61,14 @@ const FileViewer = ({
     return Number.isFinite(n) && n >= 0.5 && n <= 3 ? n : 1
   })
   useEffect(() => { localStorage.setItem('vibe-md-zoom', String(mdZoom)) }, [mdZoom])
+  const [editZoom, setEditZoom] = useState(() => {
+    const n = parseFloat(localStorage.getItem('vibe-edit-zoom'))
+    return Number.isFinite(n) && n >= 0.5 && n <= 3 ? n : 1
+  })
+  useEffect(() => { localStorage.setItem('vibe-edit-zoom', String(editZoom)) }, [editZoom])
+  // Read at edit-entry time only — keeps the scroll-restore effect off editZoom's deps.
+  const editZoomRef = useRef(editZoom)
+  editZoomRef.current = editZoom
 
   useEffect(() => {
     if (!selectedFile?.path || !isMd) { setBrokenHrefs(null); return }
@@ -195,7 +203,7 @@ const FileViewer = ({
       if (!el) return
       if (last) {
         if (last.type === 'code') {
-          el.scrollTop = Math.max(0, last.line * LINE_HEIGHT_PX)
+          el.scrollTop = Math.max(0, last.line * LINE_HEIGHT_PX * editZoomRef.current)
         } else if (last.type === 'md') {
           const denom = el.scrollHeight - el.clientHeight
           if (denom > 0) el.scrollTop = Math.max(0, Math.round(last.ratio * denom))
@@ -274,6 +282,28 @@ const FileViewer = ({
     return () => window.removeEventListener('keydown', handle)
   }, [mdZoomActive])
 
+  // Cmd +/- zoom for the edit textarea. Cmd+0 resets. Mutually exclusive with
+  // mdZoomActive — the markdown preview pane is never the edit pane.
+  const editZoomActive = isEditing && (!isMd || mdTab === 'edit')
+  useEffect(() => {
+    if (!editZoomActive) return
+    const handle = (e) => {
+      if (!(e.metaKey || e.ctrlKey)) return
+      if (e.key === '=' || e.key === '+') {
+        e.preventDefault()
+        setEditZoom(z => Math.min(3, Math.round((z + 0.1) * 100) / 100))
+      } else if (e.key === '-') {
+        e.preventDefault()
+        setEditZoom(z => Math.max(0.5, Math.round((z - 0.1) * 100) / 100))
+      } else if (e.key === '0') {
+        e.preventDefault()
+        setEditZoom(1)
+      }
+    }
+    window.addEventListener('keydown', handle)
+    return () => window.removeEventListener('keydown', handle)
+  }, [editZoomActive])
+
   const handleTextareaKeyDown = useCallback((e) => {
     // Design Ref: §4 — markdown files get outliner keymaps (Tab/Shift+Tab/Cmd+Arrow).
     // The combo is fully owned (always preventDefault) so a no-op never falls through
@@ -325,6 +355,8 @@ const FileViewer = ({
     [lineCount]
   )
   const syntaxStyle     = isDark ? vscDarkPlus : oneLight
+  const editFontPx      = EDIT_FONT_PX * editZoom
+  const editLinePx      = LINE_HEIGHT_PX * editZoom
 
   useEffect(() => {
     if (lineNumbersRef.current) lineNumbersRef.current.scrollTop = 0
@@ -468,8 +500,8 @@ const FileViewer = ({
                 borderRight: '1px solid var(--border)',
                 background: 'var(--surface)',
                 fontFamily: FONT_MONO,
-                fontSize: '12.5px',
-                lineHeight: `${LINE_HEIGHT_PX}px`,
+                fontSize: `${editFontPx}px`,
+                lineHeight: `${editLinePx}px`,
                 color: 'var(--border)',
                 textAlign: 'right',
                 userSelect: 'none',
@@ -479,14 +511,14 @@ const FileViewer = ({
                 onScroll={handleTextareaScroll}
                 spellCheck={false}
                 wrap={wrapEnabled ? 'soft' : 'off'}
-                style={{ flex:1, background:'var(--surface)', color:'var(--text)', border:'none', outline:'none', resize:'none', padding:`${EDIT_PADDING_PX}px`, fontFamily:FONT_MONO, fontSize:'12.5px', lineHeight:`${LINE_HEIGHT_PX}px`, letterSpacing:'0.01em', whiteSpace: wrapEnabled ? 'pre-wrap' : 'pre', wordBreak: wrapEnabled ? 'break-all' : undefined }} />
+                style={{ flex:1, background:'var(--surface)', color:'var(--text)', border:'none', outline:'none', resize:'none', padding:`${EDIT_PADDING_PX}px`, fontFamily:FONT_MONO, fontSize:`${editFontPx}px`, lineHeight:`${editLinePx}px`, letterSpacing:'0.01em', whiteSpace: wrapEnabled ? 'pre-wrap' : 'pre', wordBreak: wrapEnabled ? 'break-all' : undefined }} />
             </div>
           ) : showPreviewPane ? (
-            <MarkdownView content={editContent} isDark={isDark} fileDirPath={fileDirPath} rootPath={rootPath} onLinkOpen={onLinkOpen} brokenHrefs={brokenHrefs} zoom={mdZoom} onTaskToggle={onEditContentChange} />
+            <MarkdownView content={editContent} isDark={isDark} fileDirPath={fileDirPath} rootPath={rootPath} onLinkOpen={onLinkOpen} brokenHrefs={brokenHrefs} zoom={mdZoom} onTaskToggle={onEditContentChange} onActivateEdit={() => setMdTab('edit')} />
           ) : isMd ? (
             <>
               <MarkdownView content={content} isDark={isDark} fileDirPath={fileDirPath} rootPath={rootPath} onLinkOpen={onLinkOpen} brokenHrefs={brokenHrefs}
-                searchQuery={searchOpen ? searchQuery : ''} currentMatchIdx={currentMatchIdx} onMatchesFound={setMdMatchCount} zoom={mdZoom} onTaskToggle={onViewTaskToggle} />
+                searchQuery={searchOpen ? searchQuery : ''} currentMatchIdx={currentMatchIdx} onMatchesFound={setMdMatchCount} zoom={mdZoom} onTaskToggle={onViewTaskToggle} onActivateEdit={onEnterEdit} />
               <BacklinksPanel path={selectedFile?.path} rootPath={rootPath} onLinkOpen={onLinkOpen} />
             </>
           ) : skipHighlight ? (

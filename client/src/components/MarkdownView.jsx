@@ -208,12 +208,19 @@ function makeMarkdownComponents(isDark, fileDirPath, rootPath, onLinkOpen, broke
   }
 }
 
-export default function MarkdownView({ content, isDark, fileDirPath, rootPath, onLinkOpen, brokenHrefs, searchQuery = '', currentMatchIdx = 0, onMatchesFound, zoom = 1, onTaskToggle }) {
+export default function MarkdownView({ content, isDark, fileDirPath, rootPath, onLinkOpen, brokenHrefs, searchQuery = '', currentMatchIdx = 0, onMatchesFound, zoom = 1, onTaskToggle, onActivateEdit }) {
   const handleToggleLine = useCallback((line) => {
     if (!onTaskToggle) return
     const next = toggleTaskAtLine(content, line)
     if (next != null && next !== content) onTaskToggle(next)
   }, [content, onTaskToggle])
+  // Double-click rendered text to jump into editing (VS Code habit). Skip when the
+  // click lands on a checkbox or link so those keep their own click behavior.
+  const handleDoubleClick = useCallback((e) => {
+    if (!onActivateEdit) return
+    if (e.target.closest('input, a')) return
+    onActivateEdit()
+  }, [onActivateEdit])
   const components = useMemo(() => makeMarkdownComponents(isDark, fileDirPath, rootPath, onLinkOpen, brokenHrefs, onTaskToggle ? handleToggleLine : null), [isDark, fileDirPath, rootPath, onLinkOpen, brokenHrefs, onTaskToggle, handleToggleLine])
   const processedContent = useMemo(() => preprocessKoreanBold(content), [content])
   const containerRef = useRef(null)
@@ -290,7 +297,7 @@ export default function MarkdownView({ content, isDark, fileDirPath, rootPath, o
   }, [currentMatchIdx, searchQuery, content])
 
   return (
-    <div ref={containerRef} style={{ color:'var(--text)', lineHeight:'1.75', fontSize:'14px', maxWidth:'72ch', zoom }}>
+    <div ref={containerRef} onDoubleClick={onActivateEdit ? handleDoubleClick : undefined} style={{ color:'var(--text)', lineHeight:'1.75', fontSize:'14px', maxWidth:'72ch', zoom }}>
       <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]} rehypePlugins={[rehypeRaw]} components={components}>{processedContent}</ReactMarkdown>
     </div>
   )
