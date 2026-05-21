@@ -691,11 +691,11 @@ function App() {
       else if (e.key === 'Escape') { e.preventDefault(); handleEscapeKeyRef.current() }
       else if (mod && key === 'r') { e.preventDefault(); refreshAll() }
       else if (mod && key === 'f' && activeFocusRef.current === 'viewer' && selectedFileRef.current && !isEditingRef.current) { e.preventDefault(); openSearchRef.current?.() }
-      else if (mod && key === 'w' && activeIdRef.current) {
-        const t = e.target
-        if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
+      else if (mod && key === 'w') {
+        // Tab-aware close: shut the active tab if one is open, otherwise quit the app.
         e.preventDefault()
-        handleCloseTabRef.current?.(activeIdRef.current)
+        if (activeIdRef.current) handleCloseTabRef.current?.(activeIdRef.current)
+        else getCurrentWindow().close()
       }
       else if (mod && e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
         const t = e.target
