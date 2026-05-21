@@ -1,0 +1,317 @@
+// Design Ref: §4 — pure outliner keymap logic for markdown edit mode.
+// No React/DOM imports — unit-testable in isolation (see outline.test.js).
+
+export const INDENT_UNIT = 2
+export const MAX_HEADING_LEVEL = 6
+
+const FENCE_RE = /^\s{0,3}(```|~~~)/
+const HEADING_RE = /^(\s*)(#{1,6})(\s|$)/
+const UL_RE = /^(\s*)([-*+])\s/
+const OL_RE = /^(\s*)(\d+[.)])\s/
+
+function leadingSpaces(line) {
+  let n = 0
+  while (n < line.length && line[n] === ' ') n++
+  return n
+}
+
+function isBlank(line) {
+  return /^\s*$/.test(line)
+}
+
+// Design Ref: §3.3 — a `#` inside a fenced code block must not count as a heading,
+// so classification needs whole-file context, not just the single line.
+// CommonMark requires the closing fence to use the same marker char (` ``` ` vs `~~~`)
+// as the opening, so a `~~~` line cannot close a backtick fence — track the open char.
+export function buildFenceMask(lines) {
+  const mask = new Array(lines.length).fill(false)
+  let fenceChar = null // '`' or '~' while inside a fence, otherwise null
+  for (let i = 0; i < lines.length; i++) {
+    const m = FENCE_RE.exec(lines[i])
+    if (m) {
+      const char = m[1][0]
+      mask[i] = true
+      if (fenceChar === null) fenceChar = char // opening fence
+      else if (char === fenceChar) fenceChar = null // matching closing fence
+      // a fence line of the other marker while inside a fence is just content
+      continue
+    }
+    mask[i] = fenceChar !== null
+  }
+  return mask
+}
+
+// Design Ref: §3.1 — per-line LineInfo classification.
+export function classifyLines(lines) {
+  const fence = buildFenceMask(lines)
+  return lines.map((line, i) => {
+    if (isBlank(line)) return { type: 'blank' }
+    if (fence[i]) return { type: 'plain', indent: leadingSpaces(line) }
+    const h = HEADING_RE.exec(line)
+    if (h) return { type: 'heading', level: h[2].length, indent: h[1].length }
+    const ul = UL_RE.exec(line)
+    if (ul) return { type: 'list', ordered: false, marker: ul[2], indent: ul[1].length }
+    const ol = OL_RE.exec(line)
+    if (ol) return { type: 'list', ordered: true, marker: ol[2], indent: ol[1].length }
+    return { type: 'plain', indent: leadingSpaces(line) }
+  })
+}
+
+// Design Ref: §4.2 — inclusive [start, end] range of the line at idx plus its subtree.
+export function subtreeRange(infos, idx) {
+  const info = infos[idx]
+  if (!info) return [idx, idx]
+
+  if (info.type === 'heading') {
+    let end = idx
+    for (let i = idx + 1; i < infos.length; i++) {
+      const t = infos[i]
+      if (t.type === 'heading' && t.level <= info.level) break
+      end = i
+    }
+    return [idx, end]
+  }
+
+  if (info.type === 'list') {
+    let end = idx
+    for (let i = idx + 1; i < infos.length; i++) {
+      const t = infos[i]
+      if (t.type === 'blank') continue // interior blank — included only if deeper content follows
+      if ((t.indent ?? 0) > info.indent) end = i
+      else break
+    }
+    return [idx, end]
+  }
+
+  return [idx, idx] // plain / blank — no subtree
+}
+
+// --- transforms ---------------------------------------------------------------
+
+// Add (+) or remove (-) leading spaces over [s,e]. Returns new lines or null if blocked.
+export function indentRange(lines, s, e, delta) {
+  const out = lines.slice()
+  if (delta > 0) {
+    const pad = ' '.repeat(delta)
+    for (let i = s; i <= e; i++) {
+      if (isBlank(out[i])) continue
+      out[i] = pad + out[i]
+    }
+    return out
+  }
+  // Design Ref: §6.1 — outdent aborts whole op if the root line is at column 0.
+  if (leadingSpaces(lines[s]) === 0) return null
+  for (let i = s; i <= e; i++) {
+    if (isBlank(out[i])) continue
+    const remove = Math.min(-delta, leadingSpaces(out[i]))
+    out[i] = out[i].slice(remove)
+  }
+  return out
+}
+
+// Add (+1) or remove (-1) one `#` from every heading line in [s,e].
+// Design Ref: §6.1 — aborts (null) if any heading would cross the h1/h6 cap.
+export function shiftHeadingSubtree(lines, infos, s, e, delta) {
+  for (let i = s; i <= e; i++) {
+    if (infos[i].type !== 'heading') continue
+    const next = infos[i].level + delta
+    if (next < 1 || next > MAX_HEADING_LEVEL) return null
+  }
+  const out = lines.slice()
+  for (let i = s; i <= e; i++) {
+    if (infos[i].type !== 'heading') continue
+    const m = HEADING_RE.exec(out[i])
+    const hashes = delta > 0 ? m[2] + '#' : m[2].slice(1)
+    out[i] = m[1] + hashes + out[i].slice(m[1].length + m[2].length)
+  }
+  return out
+}
+
+function isSibling(cur, sib) {
+  if (!sib) return false
+  if (cur.type === 'heading') return sib.type === 'heading' && sib.level === cur.level
+  if (cur.type === 'list') return sib.type === 'list' && sib.indent === cur.indent
+  return false
+}
+
+// The next block down is a sibling only if the line right after the subtree matches level.
+function nextSiblingStart(infos, e, info) {
+  const j = e + 1
+  return j < infos.length && isSibling(info, infos[j]) ? j : -1
+}
+
+// Walk back from the line before the current block to find the previous sibling's root.
+function prevSiblingStart(infos, s, info) {
+  if (info.type === 'heading') {
+    for (let i = s - 1; i >= 0; i--) {
+      const t = infos[i]
+      if (t.type !== 'heading') continue
+      if (t.level < info.level) return -1 // hit the parent
+      if (t.level === info.level) return i
+    }
+    return -1
+  }
+  if (info.type === 'list') {
+    for (let i = s - 1; i >= 0; i--) {
+      const t = infos[i]
+      if (t.type === 'blank') continue
+      const ti = t.indent ?? 0
+      if (ti > info.indent) continue // descendant of the sibling
+      return ti === info.indent && t.type === 'list' ? i : -1
+    }
+    return -1
+  }
+  return -1
+}
+
+// Design Ref: §4.2 — swap the current block with its same-level sibling.
+// Returns { lines, range:[ns,ne] } (new range of the moved block) or null.
+export function moveSection(lines, infos, idx, dir) {
+  const info = infos[idx]
+  if (!info) return null
+
+  if (info.type === 'plain' || info.type === 'blank') {
+    const target = dir === 'up' ? idx - 1 : idx + 1
+    if (target < 0 || target >= lines.length) return null
+    const out = lines.slice()
+    const tmp = out[idx]
+    out[idx] = out[target]
+    out[target] = tmp
+    return { lines: out, range: [target, target] }
+  }
+
+  const [s, e] = subtreeRange(infos, idx)
+
+  if (dir === 'down') {
+    const sibStart = nextSiblingStart(infos, e, info)
+    if (sibStart < 0) return null
+    const [, sibEnd] = subtreeRange(infos, sibStart)
+    const block = lines.slice(s, e + 1)
+    const sibBlock = lines.slice(sibStart, sibEnd + 1)
+    const out = lines.slice(0, s).concat(sibBlock, block, lines.slice(sibEnd + 1))
+    const ns = s + sibBlock.length
+    return { lines: out, range: [ns, ns + block.length - 1] }
+  }
+
+  const sibStart = prevSiblingStart(infos, s, info)
+  if (sibStart < 0) return null
+  const block = lines.slice(s, e + 1)
+  const sibBlock = lines.slice(sibStart, s)
+  const out = lines.slice(0, sibStart).concat(block, sibBlock, lines.slice(e + 1))
+  return { lines: out, range: [sibStart, sibStart + block.length - 1] }
+}
+
+// --- dispatcher ---------------------------------------------------------------
+
+function lineOffsets(lines) {
+  const offs = new Array(lines.length)
+  let acc = 0
+  for (let i = 0; i < lines.length; i++) {
+    offs[i] = acc
+    acc += lines[i].length + 1
+  }
+  return offs
+}
+
+function lineAt(offsets, pos) {
+  for (let i = offsets.length - 1; i >= 0; i--) {
+    if (pos >= offsets[i]) return i
+  }
+  return 0
+}
+
+function clamp(v, lo, hi) {
+  return v < lo ? lo : v > hi ? hi : v
+}
+
+function identifyCombo(e) {
+  if (e.key === 'Tab') return e.shiftKey ? 'outdent' : 'indent'
+  if (e.metaKey || e.ctrlKey) {
+    if (e.key === 'ArrowUp') return 'moveUp'
+    if (e.key === 'ArrowDown') return 'moveDown'
+  }
+  return null
+}
+
+// Design Ref: §4 — per-line context rule over a multi-line selection (no subtree).
+function applyPerLine(lines, infos, startLine, endLine, combo) {
+  const out = lines.slice()
+  let changed = false
+  for (let i = startLine; i <= endLine; i++) {
+    const info = infos[i]
+    if (info.type === 'blank') continue
+    if (info.type === 'heading') {
+      const delta = combo === 'indent' ? 1 : -1
+      const next = info.level + delta
+      if (next < 1 || next > MAX_HEADING_LEVEL) continue
+      const m = HEADING_RE.exec(out[i])
+      out[i] = m[1] + (delta > 0 ? m[2] + '#' : m[2].slice(1)) + out[i].slice(m[1].length + m[2].length)
+      changed = true
+    } else if (combo === 'indent') {
+      out[i] = ' '.repeat(INDENT_UNIT) + out[i]
+      changed = true
+    } else {
+      const ls = leadingSpaces(out[i])
+      if (ls === 0) continue
+      out[i] = out[i].slice(Math.min(INDENT_UNIT, ls))
+      changed = true
+    }
+  }
+  if (!changed) return null
+  const newOffsets = lineOffsets(out)
+  return {
+    content: out.join('\n'),
+    selStart: newOffsets[startLine],
+    selEnd: newOffsets[endLine] + out[endLine].length,
+  }
+}
+
+// Design Ref: §4.1 — top-level dispatcher. Returns an applied result or null
+// (not an outline key, or a boundary no-op). Pure: no DOM, no React.
+export function handleOutlineKey(content, selStart, selEnd, event) {
+  const combo = identifyCombo(event)
+  if (!combo) return null
+
+  const lines = content.split('\n')
+  const infos = classifyLines(lines)
+  const offsets = lineOffsets(lines)
+  const startLine = lineAt(offsets, selStart)
+  const endLine = lineAt(offsets, selEnd)
+
+  if (combo === 'moveUp' || combo === 'moveDown') {
+    if (startLine !== endLine) return null // multi-line move: no-op in v1
+    const res = moveSection(lines, infos, startLine, combo === 'moveUp' ? 'up' : 'down')
+    if (!res) return null
+    const [s] = subtreeRange(infos, startLine)
+    const newLine = res.range[0] + (startLine - s)
+    const col = selStart - offsets[startLine]
+    const newOffsets = lineOffsets(res.lines)
+    const pos = newOffsets[newLine] + clamp(col, 0, res.lines[newLine].length)
+    return { content: res.lines.join('\n'), selStart: pos, selEnd: pos }
+  }
+
+  // indent / outdent
+  if (startLine !== endLine) {
+    return applyPerLine(lines, infos, startLine, endLine, combo)
+  }
+
+  const info = infos[startLine]
+  let out
+  if (info.type === 'heading') {
+    const [s, e] = subtreeRange(infos, startLine)
+    out = shiftHeadingSubtree(lines, infos, s, e, combo === 'indent' ? 1 : -1)
+  } else {
+    const [s, e] = info.type === 'list' ? subtreeRange(infos, startLine) : [startLine, startLine]
+    out = indentRange(lines, s, e, combo === 'indent' ? INDENT_UNIT : -INDENT_UNIT)
+  }
+  if (!out) return null
+
+  // Cursor stays on the same line; column shifts by that line's prefix-length change.
+  const colDelta = out[startLine].length - lines[startLine].length
+  const newOffsets = lineOffsets(out)
+  const base = newOffsets[startLine]
+  const lineLen = out[startLine].length
+  const ns = base + clamp(selStart - offsets[startLine] + colDelta, 0, lineLen)
+  const ne = base + clamp(selEnd - offsets[startLine] + colDelta, 0, lineLen)
+  return { content: out.join('\n'), selStart: ns, selEnd: ne }
+}

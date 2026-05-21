@@ -10,6 +10,7 @@ import DiffView from './DiffView'
 import MarkdownView from './MarkdownView'
 import BacklinksPanel from './BacklinksPanel'
 import { resolveKey, LINE_HEIGHT_PX, EDIT_PADDING_PX, LINE_NUM_WIDTH, FONT_MONO, FONT_UI, EXT_TO_DISPLAY, HIGHLIGHT_SIZE_LIMIT } from '../constants'
+import { handleOutlineKey } from '../outline'
 
 const NavBtn = ({ onClick, enabled, title, label, glyph }) => (
   <button onClick={onClick} disabled={!enabled} title={title} aria-label={label}
@@ -55,6 +56,11 @@ const FileViewer = ({
 
   const [mdMatchCount, setMdMatchCount] = useState(0)
   const [brokenHrefs, setBrokenHrefs] = useState(null)
+  const [mdZoom, setMdZoom] = useState(() => {
+    const n = parseFloat(localStorage.getItem('vibe-md-zoom'))
+    return Number.isFinite(n) && n >= 0.5 && n <= 3 ? n : 1
+  })
+  useEffect(() => { localStorage.setItem('vibe-md-zoom', String(mdZoom)) }, [mdZoom])
 
   useEffect(() => {
     if (!selectedFile?.path || !isMd) { setBrokenHrefs(null); return }
@@ -247,7 +253,50 @@ const FileViewer = ({
     return () => window.removeEventListener('keydown', handle)
   }, [isEditing, isMd])
 
+  // Cmd +/- zoom for markdown preview. Cmd+0 resets.
+  const mdZoomActive = isMd && !diffMode && (!isEditing || mdTab === 'preview')
+  useEffect(() => {
+    if (!mdZoomActive) return
+    const handle = (e) => {
+      if (!(e.metaKey || e.ctrlKey)) return
+      if (e.key === '=' || e.key === '+') {
+        e.preventDefault()
+        setMdZoom(z => Math.min(3, Math.round((z + 0.1) * 100) / 100))
+      } else if (e.key === '-') {
+        e.preventDefault()
+        setMdZoom(z => Math.max(0.5, Math.round((z - 0.1) * 100) / 100))
+      } else if (e.key === '0') {
+        e.preventDefault()
+        setMdZoom(1)
+      }
+    }
+    window.addEventListener('keydown', handle)
+    return () => window.removeEventListener('keydown', handle)
+  }, [mdZoomActive])
+
   const handleTextareaKeyDown = useCallback((e) => {
+    // Design Ref: §4 — markdown files get outliner keymaps (Tab/Shift+Tab/Cmd+Arrow).
+    // The combo is fully owned (always preventDefault) so a no-op never falls through
+    // to the plain insert-spaces path below.
+    if (isMd) {
+      const isOutlineCombo = e.key === 'Tab'
+        || ((e.metaKey || e.ctrlKey) && (e.key === 'ArrowUp' || e.key === 'ArrowDown'))
+      if (isOutlineCombo) {
+        e.preventDefault()
+        const ta = e.target
+        const res = handleOutlineKey(editContent, ta.selectionStart, ta.selectionEnd, e)
+        if (res) {
+          onEditContentChange(res.content)
+          requestAnimationFrame(() => {
+            if (textareaRef.current) {
+              textareaRef.current.selectionStart = res.selStart
+              textareaRef.current.selectionEnd = res.selEnd
+            }
+          })
+        }
+        return
+      }
+    }
     if (e.key === 'Tab') {
       e.preventDefault()
       const s = e.target.selectionStart, end = e.target.selectionEnd
@@ -256,7 +305,7 @@ const FileViewer = ({
     } else if ((e.metaKey || e.ctrlKey) && resolveKey(e.key) === 's') { e.preventDefault(); onSave() }
     else if (e.altKey && resolveKey(e.key) === 'z') { e.preventDefault(); setWrapEnabled(w => !w) }
     else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); onExitEdit() }
-  }, [editContent, onEditContentChange, onSave, onExitEdit])
+  }, [isMd, editContent, onEditContentChange, onSave, onExitEdit])
 
   const fileDirPath     = selectedFile?.path?.substring(0, selectedFile?.path?.lastIndexOf('/'))
   const showDiff        = !!selectedFile && diffMode && !isEditing
@@ -337,7 +386,7 @@ const FileViewer = ({
           {isEditing ? (
             <>
               <button onClick={onSave} disabled={!isDirty} style={{ background: isDirty ? 'var(--accent-sub)' : 'transparent', border:`1px solid ${isDirty ? 'var(--accent)' : 'var(--border)'}`, color: isDirty ? 'var(--accent)' : 'var(--muted)', cursor: isDirty ? 'pointer' : 'default', fontSize:'11px', padding:'2px 8px', borderRadius:'4px', fontFamily:FONT_UI }}>Save</button>
-              <button onClick={onExitEdit} style={{ background:'none', border:'1px solid var(--border)', color:'var(--muted)', cursor:'pointer', fontSize:'11px', padding:'2px 8px', borderRadius:'4px', fontFamily:FONT_UI }}>View</button>
+              <button onClick={onExitEdit} style={{ background:'none', border:'1px solid var(--border)', color:'var(--muted)', cursor:'pointer', fontSize:'11px', padding:'2px 8px', borderRadius:'4px', fontFamily:FONT_UI }}>Exit</button>
             </>
           ) : diffMode ? (
             <>
@@ -433,11 +482,11 @@ const FileViewer = ({
                 style={{ flex:1, background:'var(--surface)', color:'var(--text)', border:'none', outline:'none', resize:'none', padding:`${EDIT_PADDING_PX}px`, fontFamily:FONT_MONO, fontSize:'12.5px', lineHeight:`${LINE_HEIGHT_PX}px`, letterSpacing:'0.01em', whiteSpace: wrapEnabled ? 'pre-wrap' : 'pre', wordBreak: wrapEnabled ? 'break-all' : undefined }} />
             </div>
           ) : showPreviewPane ? (
-            <MarkdownView content={editContent} isDark={isDark} fileDirPath={fileDirPath} rootPath={rootPath} onLinkOpen={onLinkOpen} brokenHrefs={brokenHrefs} />
+            <MarkdownView content={editContent} isDark={isDark} fileDirPath={fileDirPath} rootPath={rootPath} onLinkOpen={onLinkOpen} brokenHrefs={brokenHrefs} zoom={mdZoom} />
           ) : isMd ? (
             <>
               <MarkdownView content={content} isDark={isDark} fileDirPath={fileDirPath} rootPath={rootPath} onLinkOpen={onLinkOpen} brokenHrefs={brokenHrefs}
-                searchQuery={searchOpen ? searchQuery : ''} currentMatchIdx={currentMatchIdx} onMatchesFound={setMdMatchCount} />
+                searchQuery={searchOpen ? searchQuery : ''} currentMatchIdx={currentMatchIdx} onMatchesFound={setMdMatchCount} zoom={mdZoom} />
               <BacklinksPanel path={selectedFile?.path} rootPath={rootPath} onLinkOpen={onLinkOpen} />
             </>
           ) : skipHighlight ? (
