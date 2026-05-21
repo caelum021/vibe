@@ -7,6 +7,7 @@ import {
   shiftHeadingSubtree,
   moveSection,
   handleOutlineKey,
+  continueList,
 } from './outline'
 
 const lines = (s) => s.split('\n')
@@ -160,5 +161,48 @@ describe('L3 — handleOutlineKey dispatcher', () => {
 
   it('returns null for non-outline keys', () => {
     expect(handleOutlineKey('abc', 0, 0, { key: 'a' })).toBeNull()
+  })
+})
+
+describe('L3 — continueList (Enter list continuation)', () => {
+  it('continues an unordered list item', () => {
+    expect(continueList('- item', 6, 6).content).toBe('- item\n- ')
+  })
+
+  it('continues an ordered list item with the next number', () => {
+    expect(continueList('1. item', 7, 7).content).toBe('1. item\n2. ')
+  })
+
+  it('continues a task list item, reset to unchecked', () => {
+    expect(continueList('- [ ] task', 10, 10).content).toBe('- [ ] task\n- [ ] ')
+    expect(continueList('- [x] done', 10, 10).content).toBe('- [x] done\n- [ ] ')
+  })
+
+  it('preserves indentation of a nested list item', () => {
+    expect(continueList('  - item', 8, 8).content).toBe('  - item\n  - ')
+  })
+
+  it('ends the list when Enter is pressed on an empty item', () => {
+    expect(continueList('- ', 2, 2).content).toBe('')
+    expect(continueList('  - [ ] ', 8, 8).content).toBe('')
+  })
+
+  it('splits the line and carries the marker when the cursor is mid-content', () => {
+    const res = continueList('- hello world', 8, 8)
+    expect(res.content).toBe('- hello \n- world')
+    expect(res.selStart).toBe(11) // just after the new "- " marker
+  })
+
+  it('returns null on a non-list line', () => {
+    expect(continueList('plain text', 5, 5)).toBeNull()
+  })
+
+  it('returns null when there is a selection', () => {
+    expect(continueList('- item', 2, 5)).toBeNull()
+  })
+
+  it('returns null for a list-like line inside a fenced code block', () => {
+    const src = '```\n- not a list\n```'
+    expect(continueList(src, 16, 16)).toBeNull()
   })
 })

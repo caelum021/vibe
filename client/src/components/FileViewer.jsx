@@ -10,7 +10,7 @@ import DiffView from './DiffView'
 import MarkdownView from './MarkdownView'
 import BacklinksPanel from './BacklinksPanel'
 import { resolveKey, EDIT_FONT_PX, LINE_HEIGHT_PX, EDIT_PADDING_PX, LINE_NUM_WIDTH, FONT_MONO, FONT_UI, EXT_TO_DISPLAY, HIGHLIGHT_SIZE_LIMIT } from '../constants'
-import { handleOutlineKey } from '../outline'
+import { handleOutlineKey, continueList } from '../outline'
 
 const NavBtn = ({ onClick, enabled, title, label, glyph }) => (
   <button onClick={onClick} disabled={!enabled} title={title} aria-label={label}
@@ -325,6 +325,24 @@ const FileViewer = ({
           })
         }
         return
+      }
+      // Enter continues a list item onto the next line. Skip during IME
+      // composition so a Korean Enter that commits Hangul is left alone.
+      if (e.key === 'Enter' && !e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey
+          && !e.nativeEvent?.isComposing && e.keyCode !== 229) {
+        const ta = e.target
+        const res = continueList(editContent, ta.selectionStart, ta.selectionEnd)
+        if (res) {
+          e.preventDefault()
+          onEditContentChange(res.content)
+          requestAnimationFrame(() => {
+            if (textareaRef.current) {
+              textareaRef.current.selectionStart = res.selStart
+              textareaRef.current.selectionEnd = res.selEnd
+            }
+          })
+          return
+        }
       }
     }
     if (e.key === 'Tab') {

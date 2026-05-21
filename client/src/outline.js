@@ -315,3 +315,63 @@ export function handleOutlineKey(content, selStart, selEnd, event) {
   const ne = base + clamp(selEnd - offsets[startLine] + colDelta, 0, lineLen)
   return { content: out.join('\n'), selStart: ns, selEnd: ne }
 }
+
+// --- Enter: list continuation -------------------------------------------------
+
+// GFM requires a space between the bullet and the checkbox — `- [ ]`, never `-[ ]`.
+const CONT_TASK_RE = /^(\s*)([-*+])(\s+)\[[ xX]\](\s*)/
+const CONT_OL_RE   = /^(\s*)(\d+)([.)])(\s+)/
+const CONT_UL_RE   = /^(\s*)([-*+])(\s+)/
+
+// Pressing Enter inside a list item carries the marker onto the next line;
+// pressing Enter on an *empty* list item clears the marker so the list ends.
+// Pure: returns { content, selStart, selEnd } or null — null means "let the
+// editor insert a plain newline". The caller must skip this during IME
+// composition (a Korean Enter that commits Hangul is not a list Enter).
+export function continueList(content, selStart, selEnd) {
+  if (selStart !== selEnd) return null // a selection: a plain newline replaces it
+
+  const lines = content.split('\n')
+  const offsets = lineOffsets(lines)
+  const idx = lineAt(offsets, selStart)
+  // classifyLines is fence-aware — a `- x` line inside a code block is not a list.
+  if (classifyLines(lines)[idx]?.type !== 'list') return null
+
+  const line = lines[idx]
+  const cursorCol = selStart - offsets[idx]
+
+  let prefixLen, nextPrefix
+  const task = CONT_TASK_RE.exec(line)
+  const ol = task ? null : CONT_OL_RE.exec(line)
+  const ul = task || ol ? null : CONT_UL_RE.exec(line)
+  if (task) {
+    prefixLen = task[0].length
+    nextPrefix = task[1] + task[2] + ' [ ] ' // a continued task starts unchecked
+  } else if (ol) {
+    prefixLen = ol[0].length
+    nextPrefix = ol[1] + (parseInt(ol[2], 10) + 1) + ol[3] + ' '
+  } else if (ul) {
+    prefixLen = ul[0].length
+    nextPrefix = ul[1] + ul[2] + ' '
+  } else {
+    return null
+  }
+
+  // Cursor sitting within the indent/marker — treat Enter as a plain newline.
+  if (cursorCol < prefixLen) return null
+
+  const out = lines.slice()
+  if (/^\s*$/.test(line.slice(prefixLen))) {
+    // Empty item: drop the marker so the list ends here.
+    out[idx] = ''
+    const pos = lineOffsets(out)[idx]
+    return { content: out.join('\n'), selStart: pos, selEnd: pos }
+  }
+
+  // Non-empty: split at the cursor, carry the marker onto the new line.
+  const before = line.slice(0, cursorCol)
+  const after = line.slice(cursorCol)
+  out.splice(idx, 1, before, nextPrefix + after)
+  const pos = lineOffsets(out)[idx + 1] + nextPrefix.length
+  return { content: out.join('\n'), selStart: pos, selEnd: pos }
+}
