@@ -408,6 +408,13 @@ function App() {
     catch (e) { console.error('Save failed:', e) }
   }, [])
 
+  // View-mode task-checkbox toggle: persist new content directly to the file.
+  const saveContent = useCallback(async (newContent) => {
+    if (!selectedFileRef.current) return
+    try { await api.writeFile(selectedFileRef.current.path, newContent); setFileContent(newContent) }
+    catch (e) { console.error('Save failed:', e) }
+  }, [])
+
   const openOrSwitchToFile = useCallback((file) => {
     if (!file || file.isDirectory) return
     const existing = tabsRef.current.find(t => t.file?.path === file.path)
@@ -775,7 +782,7 @@ function App() {
           )}
           {selectedFile ? (
             <div style={{ flex:1, minWidth:'40%', overflow:'hidden' }}>
-              <FileViewer key={activeId} innerRef={viewerRef} onFocus={focusViewer} onClose={closeViewer} onEnterEdit={enterEditMode} onExitEdit={exitEditMode} onSave={saveFile} onEditContentChange={setEditContent} selectedFile={selectedFile} content={fileContent} isEditing={isEditing} editContent={editContent} isDirty={isDirty} isMd={isMd} isDark={isDark} isFocused={activeFocus === 'viewer'} gitDirty={gitDirty} diffMode={diffMode} onEnterDiff={enterDiffMode} onExitDiff={exitDiffMode} externallyChanged={externallyChanged} onReload={reloadCurrentFile} openSearchRef={openSearchRef} closeSearchRef={closeSearchRef} rootPath={rootPath} onLinkOpen={handleLinkOpen} onBack={goBack} onForward={goForward} canBack={nav.index > 0} canForward={nav.index >= 0 && nav.index < nav.stack.length - 1} initialScroll={getNavScrolls(activeId)[nav.index]} onScrollChange={handleScrollChange} loading={fileLoading} />
+              <FileViewer key={activeId} innerRef={viewerRef} onFocus={focusViewer} onClose={closeViewer} onEnterEdit={enterEditMode} onExitEdit={exitEditMode} onSave={saveFile} onViewTaskToggle={saveContent} onEditContentChange={setEditContent} selectedFile={selectedFile} content={fileContent} isEditing={isEditing} editContent={editContent} isDirty={isDirty} isMd={isMd} isDark={isDark} isFocused={activeFocus === 'viewer'} gitDirty={gitDirty} diffMode={diffMode} onEnterDiff={enterDiffMode} onExitDiff={exitDiffMode} externallyChanged={externallyChanged} onReload={reloadCurrentFile} openSearchRef={openSearchRef} closeSearchRef={closeSearchRef} rootPath={rootPath} onLinkOpen={handleLinkOpen} onBack={goBack} onForward={goForward} canBack={nav.index > 0} canForward={nav.index >= 0 && nav.index < nav.stack.length - 1} initialScroll={getNavScrolls(activeId)[nav.index]} onScrollChange={handleScrollChange} loading={fileLoading} />
             </div>
           ) : (
             <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
