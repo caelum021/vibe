@@ -15,6 +15,13 @@ When AI changes your code, vibe shows you what happened, lets you review the cha
 
 [한국어 설명 (Korean README)](./README.ko.md)
 
+> **This is a fork** of [solpop-arch/vibe](https://github.com/solpop-arch/vibe) with added
+> markdown editing & outliner features. Install the prebuilt app (no Rust needed) or see what's
+> changed in **[docs/FORK.md](./docs/FORK.md)**:
+> ```bash
+> curl -fsSL https://raw.githubusercontent.com/caelum021/vibe/main/scripts/install-from-release.sh | bash
+> ```
+
 <br>
 
 ## 🚀 Getting Started
