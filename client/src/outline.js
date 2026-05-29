@@ -164,8 +164,67 @@ function prevSiblingStart(infos, s, info) {
   return -1
 }
 
-// Design Ref: §4.2 — swap the current block with its same-level sibling.
-// Returns { lines, range:[ns,ne] } (new range of the moved block) or null.
+// The nearest preceding list item shallower than `indent` — the direct list
+// parent of a block at `s`. Returns -1 if the boundary above is the document
+// top or a non-list line (no list parent to cross into).
+function listParentStart(infos, s, indent) {
+  for (let i = s - 1; i >= 0; i--) {
+    const t = infos[i]
+    if (t.type === 'blank') continue
+    if ((t.indent ?? 0) >= indent) continue // sibling-subtree content
+    return t.type === 'list' ? i : -1
+  }
+  return -1
+}
+
+// Re-pad every non-blank line in `block` by `delta` spaces (delta <= 0 in the
+// cross-level moves below — the item promotes or holds level, never deepens).
+function reindentBlock(block, delta) {
+  if (delta === 0) return block.slice()
+  if (delta > 0) {
+    const pad = ' '.repeat(delta)
+    return block.map((l) => (isBlank(l) ? l : pad + l))
+  }
+  return block.map((l) => (isBlank(l) ? l : l.slice(Math.min(-delta, leadingSpaces(l)))))
+}
+
+// Design Ref: §4.2 (extended) — a list item with no same-level sibling in the
+// move direction jumps over its parent. It lands as the last/first child of the
+// parent's adjacent sibling (level held), or promotes one level when the parent
+// has no such sibling. The moved item's level only ever rises — never deepens.
+function crossLevelMove(lines, infos, s, e, info, dir) {
+  const p = listParentStart(infos, s, info.indent)
+  if (p < 0) return null
+  const parent = infos[p]
+
+  if (dir === 'up') {
+    // A previous aunt (parent's prev sibling) accepts the item at its current
+    // level as a trailing child; otherwise the item promotes to the parent's level.
+    const hasAunt = prevSiblingStart(infos, p, parent) >= 0
+    const delta = hasAunt ? 0 : -(info.indent - parent.indent)
+    const block = reindentBlock(lines.slice(s, e + 1), delta)
+    // Lift the block out and re-insert it right before the parent (line p).
+    const out = lines.slice(0, p).concat(block, lines.slice(p, s), lines.slice(e + 1))
+    return { lines: out, range: [p, p + block.length - 1], indentDelta: delta }
+  }
+
+  // down — X is the last child of its parent, so e is the parent's subtree end.
+  const aunt = nextSiblingStart(infos, e, parent)
+  const delta = aunt >= 0 ? 0 : -(info.indent - parent.indent)
+  // With an aunt, slot in as its first child (just after the aunt's own line);
+  // otherwise promote and drop in right after the parent's subtree.
+  const after = aunt >= 0 ? aunt : e
+  const block = reindentBlock(lines.slice(s, e + 1), delta)
+  const rest = lines.slice(0, s).concat(lines.slice(e + 1))
+  const insertIdx = after + 1 - (e - s + 1) // `after` is always >= s here
+  const out = rest.slice(0, insertIdx).concat(block, rest.slice(insertIdx))
+  return { lines: out, range: [insertIdx, insertIdx + block.length - 1], indentDelta: delta }
+}
+
+// Design Ref: §4.2 — swap the current block with its same-level sibling. List
+// items with no same-level sibling fall through to a cross-level move (see above);
+// headings and plain/blank lines stay sibling-only.
+// Returns { lines, range:[ns,ne], indentDelta } (new range of the moved block) or null.
 export function moveSection(lines, infos, idx, dir) {
   const info = infos[idx]
   if (!info) return null
@@ -177,28 +236,31 @@ export function moveSection(lines, infos, idx, dir) {
     const tmp = out[idx]
     out[idx] = out[target]
     out[target] = tmp
-    return { lines: out, range: [target, target] }
+    return { lines: out, range: [target, target], indentDelta: 0 }
   }
 
   const [s, e] = subtreeRange(infos, idx)
+  const block = lines.slice(s, e + 1)
 
   if (dir === 'down') {
     const sibStart = nextSiblingStart(infos, e, info)
-    if (sibStart < 0) return null
+    if (sibStart < 0) {
+      return info.type === 'list' ? crossLevelMove(lines, infos, s, e, info, 'down') : null
+    }
     const [, sibEnd] = subtreeRange(infos, sibStart)
-    const block = lines.slice(s, e + 1)
     const sibBlock = lines.slice(sibStart, sibEnd + 1)
     const out = lines.slice(0, s).concat(sibBlock, block, lines.slice(sibEnd + 1))
     const ns = s + sibBlock.length
-    return { lines: out, range: [ns, ns + block.length - 1] }
+    return { lines: out, range: [ns, ns + block.length - 1], indentDelta: 0 }
   }
 
   const sibStart = prevSiblingStart(infos, s, info)
-  if (sibStart < 0) return null
-  const block = lines.slice(s, e + 1)
+  if (sibStart < 0) {
+    return info.type === 'list' ? crossLevelMove(lines, infos, s, e, info, 'up') : null
+  }
   const sibBlock = lines.slice(sibStart, s)
   const out = lines.slice(0, sibStart).concat(block, sibBlock, lines.slice(e + 1))
-  return { lines: out, range: [sibStart, sibStart + block.length - 1] }
+  return { lines: out, range: [sibStart, sibStart + block.length - 1], indentDelta: 0 }
 }
 
 // --- dispatcher ---------------------------------------------------------------
@@ -286,7 +348,9 @@ export function handleOutlineKey(content, selStart, selEnd, event) {
     const newLine = res.range[0] + (startLine - s)
     const col = selStart - offsets[startLine]
     const newOffsets = lineOffsets(res.lines)
-    const pos = newOffsets[newLine] + clamp(col, 0, res.lines[newLine].length)
+    // A cross-level move re-indents the line; shift the column to keep the
+    // cursor on the same character.
+    const pos = newOffsets[newLine] + clamp(col + (res.indentDelta ?? 0), 0, res.lines[newLine].length)
     return { content: res.lines.join('\n'), selStart: pos, selEnd: pos }
   }
 

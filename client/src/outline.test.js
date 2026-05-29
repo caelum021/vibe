@@ -164,6 +164,79 @@ describe('L3 — handleOutlineKey dispatcher', () => {
   })
 })
 
+describe('L4 — cross-level move (Cmd+Up/Down jumps over the parent)', () => {
+  // - a
+  // - b
+  //   - c
+  //   - d
+  //     - e
+  // - f
+  //   - g
+  const tree = ['- a', '- b', '  - c', '  - d', '    - e', '- f', '  - g'].join('\n')
+
+  it('situation 1: a lone deep item drops under its parent\'s previous sibling, level held', () => {
+    const pos = tree.indexOf('- e')
+    const res = handleOutlineKey(tree, pos, pos, cmdUp)
+    expect(res.content).toBe(
+      ['- a', '- b', '  - c', '    - e', '  - d', '- f', '  - g'].join('\n'),
+    )
+  })
+
+  it('situation 2: with no aunt at the target level, the item promotes one level', () => {
+    const afterS1 = ['- a', '- b', '  - c', '    - e', '  - d', '- f', '  - g'].join('\n')
+    const pos = afterS1.indexOf('- e')
+    const res = handleOutlineKey(afterS1, pos, pos, cmdUp)
+    expect(res.content).toBe(
+      ['- a', '- b', '  - e', '  - c', '  - d', '- f', '  - g'].join('\n'),
+    )
+  })
+
+  it('situation 3: a top-level item still swaps with its sibling, carrying children', () => {
+    const pos = tree.indexOf('- f')
+    const res = handleOutlineKey(tree, pos, pos, cmdUp)
+    expect(res.content).toBe(
+      ['- a', '- f', '  - g', '- b', '  - c', '  - d', '    - e'].join('\n'),
+    )
+  })
+
+  it('keeps the cursor on the same character after a promoting move', () => {
+    const afterS1 = ['- a', '- b', '  - c', '    - e', '  - d', '- f', '  - g'].join('\n')
+    const pos = afterS1.indexOf('e') // on the letter "e"
+    const res = handleOutlineKey(afterS1, pos, pos, cmdUp)
+    expect(res.content[res.selStart]).toBe('e')
+  })
+
+  it('Cmd+Down: a last child becomes the first child of the parent\'s next sibling', () => {
+    const src = ['- b', '  - c', '  - d', '- f', '  - g'].join('\n')
+    const pos = src.indexOf('- d')
+    const res = handleOutlineKey(src, pos, pos, cmdDown)
+    expect(res.content).toBe(['- b', '  - c', '- f', '  - d', '  - g'].join('\n'))
+  })
+
+  it('Cmd+Down: promotes when the parent has no next sibling', () => {
+    const src = ['- b', '  - c', '  - d'].join('\n')
+    const pos = src.indexOf('- d')
+    const res = handleOutlineKey(src, pos, pos, cmdDown)
+    expect(res.content).toBe(['- b', '  - c', '- d'].join('\n'))
+  })
+
+  it('carries the whole subtree when crossing a level', () => {
+    // move "    - d" (with child "      - d1") up past parent "  - c"
+    const src = ['- p', '  - b', '  - c', '    - d', '      - d1'].join('\n')
+    const pos = src.indexOf('- d\n')
+    const res = handleOutlineKey(src, pos, pos, cmdUp)
+    // c has no previous level-2 sibling under it for d, so d's parent is c;
+    // c's previous sibling b accepts d as a trailing child at the same level.
+    expect(res.content).toBe(
+      ['- p', '  - b', '    - d', '      - d1', '  - c'].join('\n'),
+    )
+  })
+
+  it('Cmd+Up on a top-level first item with no parent is a no-op', () => {
+    expect(handleOutlineKey('- a\n- b', 0, 0, cmdUp)).toBeNull()
+  })
+})
+
 describe('L3 — continueList (Enter list continuation)', () => {
   it('continues an unordered list item', () => {
     expect(continueList('- item', 6, 6).content).toBe('- item\n- ')
