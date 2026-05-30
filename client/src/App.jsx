@@ -16,6 +16,9 @@ import {
   SHORTCUTS_VIEWER_EDIT, SHORTCUTS_VIEWER_EDIT_MD, SHORTCUTS_EXPLORER,
 } from './constants'
 
+// Debounce for after-delay auto-save: save ~1s after the last keystroke (VS Code default).
+const AUTOSAVE_DELAY_MS = 1000
+
 // ── Sidebar resize ────────────────────────────────────────────────────────────
 const SIDEBAR_DEFAULT_WIDTH = 220
 const SIDEBAR_MIN_WIDTH     = 180
@@ -94,6 +97,7 @@ function App() {
   const closeSearchRef     = useRef(null)
   const externallyChangedRef = useRef(false)
   const activeFocusRef     = useRef('explorer')
+  const autoSaveRef        = useRef(true)
 
   const [rootReady, setRootReady]               = useState(false)
   const [tabs, setTabs]                         = useState([])
@@ -106,6 +110,7 @@ function App() {
   const [explorerAtRoot, setExplorerAtRoot]     = useState(true)
   const [refreshKey, setRefreshKey]             = useState(0)
   const [theme, setTheme]                       = useState(() => localStorage.getItem('vibe-theme') || 'light')
+  const [autoSave, setAutoSave]                 = useState(() => localStorage.getItem('vibe-autosave') !== 'false') // default ON
   const [aboutOpen, setAboutOpen]               = useState(false)
   const [rootPath, setRootPath]                 = useState('')
   const [changedFiles, setChangedFiles]         = useState(new Set())
@@ -167,6 +172,8 @@ function App() {
     localStorage.setItem('vibe-theme', theme)
   }, [theme])
 
+  useEffect(() => { localStorage.setItem('vibe-autosave', String(autoSave)) }, [autoSave])
+
   useEffect(() => {
     localStorage.setItem('vibe-sidebar-width', String(sidebarWidth))
   }, [sidebarWidth])
@@ -220,6 +227,7 @@ function App() {
   rootPathRef.current         = rootPath
   externallyChangedRef.current = externallyChanged
   activeFocusRef.current       = activeFocus
+  autoSaveRef.current          = autoSave
 
   const isDirty = isEditing && editContent !== fileContent
 
@@ -362,6 +370,25 @@ function App() {
     catch (e) { console.error('Save failed:', e) }
   }, [])
 
+  // Auto-save (toggle in footer, default on). Two triggers:
+  // 1) after-delay — save the active tab ~1s after typing stops;
+  // 2) on focus change — window blur here, plus tab/file switches and edit-exit
+  //    in the handlers below. The moved item's edits live in the tab buffer until
+  //    saved, so nothing is lost even when auto-save is off.
+  useEffect(() => {
+    if (!autoSave || !isEditing || editContent === fileContent) return
+    const t = setTimeout(() => { saveFile() }, AUTOSAVE_DELAY_MS)
+    return () => clearTimeout(t)
+  }, [autoSave, isEditing, editContent, fileContent, saveFile])
+
+  useEffect(() => {
+    const onBlur = () => {
+      if (autoSaveRef.current && isEditingRef.current && editContentRef.current !== fileContentRef.current) saveFile()
+    }
+    window.addEventListener('blur', onBlur)
+    return () => window.removeEventListener('blur', onBlur)
+  }, [saveFile])
+
   const openOrSwitchToFile = useCallback((file) => {
     if (!file || file.isDirectory) return
     const existing = tabsRef.current.find(t => t.file?.path === file.path)
@@ -434,8 +461,12 @@ function App() {
   }, [handleFocusChange, closeTab, replaceActiveFile, setIsEditing, setExternallyChanged, updateTabById])
 
   const requireClean = useCallback((action) => {
-    if (isEditingRef.current && editContentRef.current !== fileContentRef.current) setPendingAction(action); else executeAction(action)
-  }, [executeAction])
+    const dirty = isEditingRef.current && editContentRef.current !== fileContentRef.current
+    if (!dirty) { executeAction(action); return }
+    // Auto-save on focus change: persist, then proceed without the prompt.
+    if (autoSaveRef.current) { saveFile().finally(() => executeAction(action)); return }
+    setPendingAction(action)
+  }, [executeAction, saveFile])
   requireCleanRef.current = requireClean
 
   const handleFileSelect       = useCallback((file) => openOrSwitchToFile(file), [openOrSwitchToFile])
@@ -452,8 +483,13 @@ function App() {
     const t = tabsRef.current.find(x => x.id === id)
     if (!t) return
     const dirty = t.isEditing && t.editContent !== t.content
-    if (dirty) { setActiveId(id); setPendingAction({ type:'close', id }); return }
-    closeTab(id)
+    if (!dirty) { closeTab(id); return }
+    // Auto-save the closing tab's buffer directly (it may not be the active tab).
+    if (autoSaveRef.current && t.file) {
+      api.writeFile(t.file.path, t.editContent).catch(e => console.error('Save failed:', e)).finally(() => closeTab(id))
+      return
+    }
+    setActiveId(id); setPendingAction({ type:'close', id })
   }, [closeTab])
   const goBack                 = useCallback(() => {
     if (!selectedFileRef.current) return
@@ -469,19 +505,26 @@ function App() {
     const newIdx = index + 1
     requireCleanRef.current({ type:'changeFile', file: stack[newIdx], fromHistory: true, newIndex: newIdx })
   }, [])
+  // Auto-save the tab being left before the active tab changes. saveFile reads the
+  // current (leaving) tab's refs synchronously, so this fires before setActiveId.
+  const autoSaveLeavingTab = useCallback(() => {
+    if (autoSaveRef.current && isEditingRef.current && editContentRef.current !== fileContentRef.current) saveFile()
+  }, [saveFile])
   const switchToTab            = useCallback((id) => {
     if (id === activeIdRef.current) return
+    autoSaveLeavingTab()
     setActiveId(id)
     handleFocusChange('viewer')
-  }, [handleFocusChange])
+  }, [handleFocusChange, autoSaveLeavingTab])
   const switchTabRelative      = useCallback((delta) => {
     const ts = tabsRef.current
     if (ts.length < 2) return
     const idx = ts.findIndex(t => t.id === activeIdRef.current)
     if (idx < 0) return
+    autoSaveLeavingTab()
     const next = ts[(idx + delta + ts.length) % ts.length]
     setActiveId(next.id)
-  }, [])
+  }, [autoSaveLeavingTab])
   goBackRef.current    = goBack
   goForwardRef.current = goForward
   handleCloseTabRef.current = handleCloseTab
@@ -751,6 +794,12 @@ function App() {
             onMouseEnter={e => { e.currentTarget.style.background='var(--surface)'; e.currentTarget.style.color='var(--text)' }}
             onMouseLeave={e => { e.currentTarget.style.background='none'; e.currentTarget.style.color='var(--muted)' }}
             style={{ background:'none', border:'1px solid var(--border)', color:'var(--muted)', borderRadius:'4px', padding:'1px 6px', fontSize:'11px', cursor:'pointer', transition:'all 150ms' }}>+</button>
+          <button onClick={() => setAutoSave(a => !a)} title="자동저장: 입력 후·탭 전환·창 비활성화 시 자동 저장"
+            onMouseEnter={e => { if (!autoSave) { e.currentTarget.style.background='var(--surface)'; e.currentTarget.style.color='var(--text)' } }}
+            onMouseLeave={e => { if (!autoSave) { e.currentTarget.style.background='none'; e.currentTarget.style.color='var(--muted)' } }}
+            style={{ background: autoSave ? 'var(--accent-sub)' : 'none', border:'1px solid ' + (autoSave ? 'var(--accent)' : 'var(--border)'), color: autoSave ? 'var(--accent)' : 'var(--muted)', borderRadius:'4px', padding:'2px 8px', fontSize:'10px', cursor:'pointer', fontFamily:FONT_UI, transition:'all 150ms' }}>
+            {autoSave ? 'Auto-save: On' : 'Auto-save: Off'}
+          </button>
           <button onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} title="⌘⇧L"
             onMouseEnter={e => { e.currentTarget.style.background='var(--surface)'; e.currentTarget.style.color='var(--text)' }}
             onMouseLeave={e => { e.currentTarget.style.background='none'; e.currentTarget.style.color='var(--muted)' }}
