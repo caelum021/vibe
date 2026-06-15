@@ -262,7 +262,7 @@ const FileViewer = ({
   }, [isEditing, isMd])
 
   // Cmd +/- zoom for markdown preview. Cmd+0 resets.
-  const mdZoomActive = isMd && !diffMode && (!isEditing || mdTab === 'preview')
+  const mdZoomActive = isFocused && isMd && !diffMode && (!isEditing || mdTab === 'preview')
   useEffect(() => {
     if (!mdZoomActive) return
     const handle = (e) => {
@@ -284,7 +284,7 @@ const FileViewer = ({
 
   // Cmd +/- zoom for the edit textarea. Cmd+0 resets. Mutually exclusive with
   // mdZoomActive — the markdown preview pane is never the edit pane.
-  const editZoomActive = isEditing && (!isMd || mdTab === 'edit')
+  const editZoomActive = isFocused && isEditing && (!isMd || mdTab === 'edit')
   useEffect(() => {
     if (!editZoomActive) return
     const handle = (e) => {

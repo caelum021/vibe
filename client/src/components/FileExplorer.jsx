@@ -9,6 +9,11 @@ const FileExplorer = ({ onFileSelect, isFocused, onFocus, innerRef, onAtRootChan
   const [selectedIndex, setSelectedIndex]   = useState(0)
   const [naming, setNaming]                 = useState({ active:false, type:'', value:'', oldPath:'', parentPath:'' })
   const [hoveredPath, setHoveredPath]       = useState(null)
+  const [zoom, setZoom] = useState(() => {
+    const n = parseFloat(localStorage.getItem('vibe-explorer-zoom'))
+    return Number.isFinite(n) && n >= 0.5 && n <= 3 ? n : 1
+  })
+  useEffect(() => { localStorage.setItem('vibe-explorer-zoom', String(zoom)) }, [zoom])
   const rootPathRef = useRef('')
   const inputRef    = useRef(null)
 
@@ -264,6 +269,27 @@ const FileExplorer = ({ onFileSelect, isFocused, onFocus, innerRef, onAtRootChan
     return () => window.removeEventListener('keydown', handle)
   }, [isFocused, naming.active, visibleItems, selectedIndex, toggleDir, onFileSelect, expandedDirs, handleDelete, copyPath])
 
+  // Cmd +/- zoom for the explorer tree. Cmd+0 resets. Active only while the
+  // explorer is focused, so it stays independent from the viewer's own zoom.
+  useEffect(() => {
+    if (!isFocused) return
+    const handle = (e) => {
+      if (!(e.metaKey || e.ctrlKey)) return
+      if (e.key === '=' || e.key === '+') {
+        e.preventDefault()
+        setZoom(z => Math.min(3, Math.round((z + 0.1) * 100) / 100))
+      } else if (e.key === '-') {
+        e.preventDefault()
+        setZoom(z => Math.max(0.5, Math.round((z - 0.1) * 100) / 100))
+      } else if (e.key === '0') {
+        e.preventDefault()
+        setZoom(1)
+      }
+    }
+    window.addEventListener('keydown', handle)
+    return () => window.removeEventListener('keydown', handle)
+  }, [isFocused])
+
   const renderInput = (depth) => (
     <form onSubmit={handleNamingSubmit} style={{ padding:`4px 16px 4px ${getIndent(depth)}px` }}>
       <input
@@ -278,11 +304,11 @@ const FileExplorer = ({ onFileSelect, isFocused, onFocus, innerRef, onAtRootChan
   )
 
   return (
-    <div ref={innerRef} tabIndex={0} onFocus={onFocus} style={{ display:'flex', flexDirection:'column', height:'100%', outline:'none', background:'var(--bg)' }}>
+    <div ref={innerRef} tabIndex={0} onFocus={onFocus} style={{ display:'flex', flexDirection:'column', height:'100%', outline:'none', background:'var(--bg)', zoom }}>
       {/* Header — actions revealed on hover only */}
       <div
         className="explorer-header"
-        style={{ padding:'10px 16px 6px', fontSize:'10px', fontWeight:500, color:'var(--muted)', textTransform:'uppercase', letterSpacing:'0.08em', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}
+        style={{ padding:'10px 16px 6px', fontSize:'12px', fontWeight:500, color:'var(--muted)', textTransform:'uppercase', letterSpacing:'0.08em', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}
       >
         <span>Explorer</span>
         <div className="explorer-actions" style={{ display:'flex', gap:'14px' }}>
@@ -351,17 +377,17 @@ const FileExplorer = ({ onFileSelect, isFocused, onFocus, innerRef, onAtRootChan
                   )}
 
                   {item.isDirectory ? (
-                    <span style={{ fontSize:'13px', color:'var(--text)', width:'14px', flexShrink:0, display:'inline-block', textAlign:'center', transition:'transform 150ms', transform: isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)' }}>▾</span>
+                    <span style={{ fontSize:'13px', fontWeight:700, color: isExpanded ? 'var(--accent)' : 'var(--text)', width:'16px', flexShrink:0, display:'inline-block', textAlign:'center', lineHeight:1, transition:'transform 150ms', transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>❯</span>
                   ) : (
-                    <span style={{ fontSize:'11px', color:'var(--muted)', width:'14px', flexShrink:0, textAlign:'center', fontStyle:'normal' }}>{icon.ch}</span>
+                    <span style={{ fontSize:'11px', color:'var(--muted)', width:'16px', flexShrink:0, textAlign:'center', fontStyle:'normal' }}>{icon.ch}</span>
                   )}
 
                   <span style={{
                     overflow:'hidden', textOverflow:'ellipsis', flex:1,
-                    fontFamily: item.isDirectory ? FONT_SERIF : FONT_UI,
-                    fontStyle: item.isDirectory ? 'italic' : 'normal',
-                    fontSize: item.isDirectory ? '14px' : '13px',
-                    fontWeight: 400, lineHeight: item.isDirectory ? '1.4' : '1.5',
+                    fontFamily: FONT_UI,
+                    fontStyle: 'normal',
+                    fontSize: '13px',
+                    fontWeight: item.isDirectory ? 500 : 400, lineHeight: '1.5',
                     color: isActive ? 'var(--accent)' : 'var(--text)',
                   }}>
                     {item.name}{item.isDirectory ? '/' : ''}
